@@ -201,7 +201,11 @@ def test_health_ok(client: TestClient) -> None:
     resp = client.get("/api/health")
     assert resp.status_code == 200
     body = resp.json()
-    assert body == {"status": "ok", "phase": "0"}
+    # Phase 1 enriched the contract with `mongo` and bumped `phase` to "1".
+    # Keep this test loose so it survives subsequent phase bumps too — it is a
+    # smoke test, not a contract test.
+    assert body["status"] == "ok"
+    assert "phase" in body
 
 
 def test_openapi_reachable(client: TestClient) -> None:

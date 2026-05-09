@@ -4,6 +4,7 @@ boto3
 openai>=1.40
 tenacity
 pydantic>=2
+pymongo>=4.7
 pytest
 pytest-asyncio
 httpx
