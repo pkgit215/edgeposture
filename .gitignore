@@ -1,6 +1,24 @@
-.ruleiq/
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# env / secrets
 .env
 .env.*
-__pycache__/
-node_modules/
+!.env.example
+
+# build / dist artifacts
+dist/
+build/
+*.tar.gz
+
+# os / editor
 .DS_Store
+.idea/
+.vscode/

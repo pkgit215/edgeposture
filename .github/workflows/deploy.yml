@@ -1,0 +1,133 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: "371126261144"
+  ECR_REPO: ruleiq
+  APP_RUNNER_SERVICE: ruleiq
+  INSTANCE_ROLE_ARN: arn:aws:iam::371126261144:role/ruleiq-apprunner-instance
+  ACCESS_ROLE_ARN: arn:aws:iam::371126261144:role/ruleiq-apprunner-ecr-access
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::371126261144:role/ruleiq-github-deployer
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag and push image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI_SHA="$REGISTRY/$ECR_REPO:$IMAGE_TAG"
+          IMAGE_URI_LATEST="$REGISTRY/$ECR_REPO:latest"
+          docker build -t "$IMAGE_URI_SHA" -t "$IMAGE_URI_LATEST" .
+          docker push "$IMAGE_URI_SHA"
+          docker push "$IMAGE_URI_LATEST"
+          echo "IMAGE_URI_LATEST=$IMAGE_URI_LATEST" >> "$GITHUB_ENV"
+
+      - name: Deploy to App Runner (create or update)
+        id: deploy
+        env:
+          IMAGE_URI_LATEST: ${{ env.IMAGE_URI_LATEST }}
+        run: |
+          set -euo pipefail
+          SERVICE_ARN=$(aws apprunner list-services \
+            --region "$AWS_REGION" \
+            --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE'].ServiceArn | [0]" \
+            --output text)
+
+          if [ "$SERVICE_ARN" = "None" ] || [ -z "$SERVICE_ARN" ]; then
+            echo "Creating App Runner service '$APP_RUNNER_SERVICE'..."
+            cat > /tmp/source-config.json <<JSON
+          {
+            "ImageRepository": {
+              "ImageIdentifier": "$IMAGE_URI_LATEST",
+              "ImageRepositoryType": "ECR",
+              "ImageConfiguration": {
+                "Port": "8080",
+                "RuntimeEnvironmentVariables": {
+                  "DEMO_MODE": "true"
+                }
+              }
+            },
+            "AutoDeploymentsEnabled": true,
+            "AuthenticationConfiguration": {
+              "AccessRoleArn": "$ACCESS_ROLE_ARN"
+            }
+          }
+          JSON
+            cat > /tmp/instance-config.json <<JSON
+          {
+            "Cpu": "0.25 vCPU",
+            "Memory": "0.5 GB",
+            "InstanceRoleArn": "$INSTANCE_ROLE_ARN"
+          }
+          JSON
+            cat > /tmp/health-check.json <<'JSON'
+          {
+            "Protocol": "HTTP",
+            "Path": "/api/health",
+            "Interval": 10,
+            "Timeout": 5,
+            "HealthyThreshold": 1,
+            "UnhealthyThreshold": 5
+          }
+          JSON
+            CREATE_OUT=$(aws apprunner create-service \
+              --region "$AWS_REGION" \
+              --service-name "$APP_RUNNER_SERVICE" \
+              --source-configuration file:///tmp/source-config.json \
+              --instance-configuration file:///tmp/instance-config.json \
+              --health-check-configuration file:///tmp/health-check.json)
+            SERVICE_ARN=$(echo "$CREATE_OUT" | python -c "import json,sys;print(json.load(sys.stdin)['Service']['ServiceArn'])")
+            SERVICE_URL=$(echo "$CREATE_OUT" | python -c "import json,sys;print(json.load(sys.stdin)['Service']['ServiceUrl'])")
+          else
+            echo "Service exists ($SERVICE_ARN). Triggering deployment..."
+            aws apprunner start-deployment \
+              --region "$AWS_REGION" \
+              --service-arn "$SERVICE_ARN" >/dev/null
+            SERVICE_URL=$(aws apprunner describe-service \
+              --region "$AWS_REGION" \
+              --service-arn "$SERVICE_ARN" \
+              --query 'Service.ServiceUrl' --output text)
+          fi
+
+          echo "SERVICE_ARN=$SERVICE_ARN" >> "$GITHUB_OUTPUT"
+          echo "SERVICE_URL=$SERVICE_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Job summary
+        env:
+          SERVICE_URL: ${{ steps.deploy.outputs.SERVICE_URL }}
+          SERVICE_ARN: ${{ steps.deploy.outputs.SERVICE_ARN }}
+        run: |
+          {
+            echo "## RuleIQ deploy"
+            echo ""
+            echo "- Image: \`${{ env.IMAGE_URI_LATEST }}\`"
+            echo "- Service ARN: \`${SERVICE_ARN}\`"
+            echo "- Service URL: https://${SERVICE_URL}"
+            echo "- Health: https://${SERVICE_URL}/api/health"
+            echo "- Analyze: \`curl -X POST https://${SERVICE_URL}/api/poc/analyze\`"
+          } >> "$GITHUB_STEP_SUMMARY"

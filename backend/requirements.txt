@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+boto3
+openai>=1.40
+tenacity
+pydantic>=2
+pytest
+pytest-asyncio
+httpx

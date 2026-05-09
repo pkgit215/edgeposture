@@ -1,0 +1,254 @@
+[
+  {
+    "rule_name": "BlockKnownMaliciousIPs",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 10,
+    "action": "BLOCK",
+    "statement_json": {
+      "IPSetReferenceStatement": {
+        "ARN": "arn:aws:wafv2:us-east-1:371126261144:regional/ipset/known-malicious-ips/abc123"
+      }
+    },
+    "hit_count": 18432,
+    "last_fired": "2026-02-15T14:23:11Z",
+    "count_mode_hits": 0,
+    "sample_uris": [
+      "/login",
+      "/api/v1/auth/token",
+      "/wp-admin",
+      "/.env",
+      "/admin/config.php"
+    ],
+    "fms_managed": false,
+    "override_action": null
+  },
+  {
+    "rule_name": "RateLimitLoginEndpoint",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 20,
+    "action": "BLOCK",
+    "statement_json": {
+      "RateBasedStatement": {
+        "Limit": 100,
+        "AggregateKeyType": "IP",
+        "ScopeDownStatement": {
+          "ByteMatchStatement": {
+            "FieldToMatch": {"UriPath": {}},
+            "PositionalConstraint": "STARTS_WITH",
+            "SearchString": "/api/v1/auth/login",
+            "TextTransformations": [{"Priority": 0, "Type": "NONE"}]
+          }
+        }
+      }
+    },
+    "hit_count": 2741,
+    "last_fired": "2026-02-16T08:55:42Z",
+    "count_mode_hits": 0,
+    "sample_uris": [
+      "/api/v1/auth/login",
+      "/api/v1/auth/login?next=/dashboard"
+    ],
+    "fms_managed": false,
+    "override_action": null
+  },
+  {
+    "rule_name": "BlockBadBotsByUserAgent",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 30,
+    "action": "BLOCK",
+    "statement_json": {
+      "ByteMatchStatement": {
+        "FieldToMatch": {"SingleHeader": {"Name": "user-agent"}},
+        "PositionalConstraint": "CONTAINS",
+        "SearchString": "sqlmap",
+        "TextTransformations": [{"Priority": 0, "Type": "LOWERCASE"}]
+      }
+    },
+    "hit_count": 612,
+    "last_fired": "2026-02-16T03:11:09Z",
+    "count_mode_hits": 0,
+    "sample_uris": [
+      "/search?q=test",
+      "/products?id=1"
+    ],
+    "fms_managed": false,
+    "override_action": null
+  },
+  {
+    "rule_name": "BlockLegacyAdminPath",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 40,
+    "action": "BLOCK",
+    "statement_json": {
+      "ByteMatchStatement": {
+        "FieldToMatch": {"UriPath": {}},
+        "PositionalConstraint": "STARTS_WITH",
+        "SearchString": "/legacy-admin",
+        "TextTransformations": [{"Priority": 0, "Type": "LOWERCASE"}]
+      }
+    },
+    "hit_count": 0,
+    "last_fired": null,
+    "count_mode_hits": 0,
+    "sample_uris": [],
+    "fms_managed": false,
+    "override_action": null
+  },
+  {
+    "rule_name": "BlockOldStagingHeader",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 50,
+    "action": "BLOCK",
+    "statement_json": {
+      "ByteMatchStatement": {
+        "FieldToMatch": {"SingleHeader": {"Name": "x-staging-key"}},
+        "PositionalConstraint": "EXACTLY",
+        "SearchString": "internal-2019",
+        "TextTransformations": [{"Priority": 0, "Type": "NONE"}]
+      }
+    },
+    "hit_count": 0,
+    "last_fired": null,
+    "count_mode_hits": 0,
+    "sample_uris": [],
+    "fms_managed": false,
+    "override_action": null
+  },
+  {
+    "rule_name": "BlockSQLInjectionInQueryString",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 60,
+    "action": "BLOCK",
+    "statement_json": {
+      "SqliMatchStatement": {
+        "FieldToMatch": {"QueryString": {}},
+        "TextTransformations": [
+          {"Priority": 0, "Type": "URL_DECODE"},
+          {"Priority": 1, "Type": "HTML_ENTITY_DECODE"}
+        ],
+        "SensitivityLevel": "LOW"
+      }
+    },
+    "hit_count": 1,
+    "last_fired": "2026-01-29T22:04:00Z",
+    "count_mode_hits": 0,
+    "sample_uris": [
+      "/search?q=foo"
+    ],
+    "fms_managed": false,
+    "override_action": null
+  },
+  {
+    "rule_name": "AllowOfficeIPRange",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 70,
+    "action": "ALLOW",
+    "statement_json": {
+      "IPSetReferenceStatement": {
+        "ARN": "arn:aws:wafv2:us-east-1:371126261144:regional/ipset/office-ips/def456"
+      }
+    },
+    "hit_count": 8420,
+    "last_fired": "2026-02-16T09:01:33Z",
+    "count_mode_hits": 0,
+    "sample_uris": [
+      "/admin",
+      "/internal/reports"
+    ],
+    "fms_managed": false,
+    "override_action": null
+  },
+  {
+    "rule_name": "BlockOfficeIPRangeOnAdmin",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 75,
+    "action": "BLOCK",
+    "statement_json": {
+      "AndStatement": {
+        "Statements": [
+          {
+            "IPSetReferenceStatement": {
+              "ARN": "arn:aws:wafv2:us-east-1:371126261144:regional/ipset/office-ips/def456"
+            }
+          },
+          {
+            "ByteMatchStatement": {
+              "FieldToMatch": {"UriPath": {}},
+              "PositionalConstraint": "STARTS_WITH",
+              "SearchString": "/admin",
+              "TextTransformations": [{"Priority": 0, "Type": "LOWERCASE"}]
+            }
+          }
+        ]
+      }
+    },
+    "hit_count": 47,
+    "last_fired": "2026-02-14T18:22:10Z",
+    "count_mode_hits": 0,
+    "sample_uris": [
+      "/admin",
+      "/admin/users"
+    ],
+    "fms_managed": false,
+    "override_action": null
+  },
+  {
+    "rule_name": "BlockMaliciousIPsDuplicate",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 80,
+    "action": "BLOCK",
+    "statement_json": {
+      "IPSetReferenceStatement": {
+        "ARN": "arn:aws:wafv2:us-east-1:371126261144:regional/ipset/known-malicious-ips/abc123"
+      }
+    },
+    "hit_count": 12,
+    "last_fired": "2026-02-10T10:00:00Z",
+    "count_mode_hits": 0,
+    "sample_uris": [
+      "/login",
+      "/wp-admin"
+    ],
+    "fms_managed": false,
+    "override_action": null
+  },
+  {
+    "rule_name": "FMS-AWSManagedRulesCommonRuleSet",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 100,
+    "action": "BLOCK",
+    "statement_json": {
+      "ManagedRuleGroupStatement": {
+        "VendorName": "AWS",
+        "Name": "AWSManagedRulesCommonRuleSet"
+      }
+    },
+    "hit_count": 0,
+    "last_fired": null,
+    "count_mode_hits": 0,
+    "sample_uris": [],
+    "fms_managed": true,
+    "override_action": null
+  },
+  {
+    "rule_name": "FMS-AWSManagedRulesAmazonIpReputationList",
+    "web_acl_name": "ruleiq-prod-acl",
+    "priority": 110,
+    "action": "BLOCK",
+    "statement_json": {
+      "ManagedRuleGroupStatement": {
+        "VendorName": "AWS",
+        "Name": "AWSManagedRulesAmazonIpReputationList"
+      }
+    },
+    "hit_count": 4310,
+    "last_fired": "2026-02-16T07:44:19Z",
+    "count_mode_hits": 0,
+    "sample_uris": [
+      "/",
+      "/api/v1/health"
+    ],
+    "fms_managed": true,
+    "override_action": "None"
+  }
+]
