@@ -16,6 +16,7 @@ env:
   APP_RUNNER_SERVICE: ruleiq
   INSTANCE_ROLE_ARN: arn:aws:iam::371126261144:role/ruleiq-apprunner-instance
   ACCESS_ROLE_ARN: arn:aws:iam::371126261144:role/ruleiq-apprunner-ecr-access
+  PUBLIC_TEMPLATES_BUCKET: ruleiq-public-templates-371126261144
 
 jobs:
   deploy:
@@ -47,7 +48,21 @@ jobs:
           docker push "$IMAGE_URI_LATEST"
           echo "IMAGE_URI_LATEST=$IMAGE_URI_LATEST" >> "$GITHUB_ENV"
 
-      - name: Deploy to App Runner (create or update)
+      - name: Upload CFN customer-role template to public bucket
+        run: |
+          set -euo pipefail
+          if aws s3api head-bucket --bucket "$PUBLIC_TEMPLATES_BUCKET" 2>/dev/null; then
+            aws s3 cp cloudformation/customer-role.yaml \
+              "s3://${PUBLIC_TEMPLATES_BUCKET}/customer-role.yaml" \
+              --region "$AWS_REGION" \
+              --content-type "application/x-yaml"
+            echo "Uploaded to s3://${PUBLIC_TEMPLATES_BUCKET}/customer-role.yaml"
+          else
+            echo "WARNING: bucket ${PUBLIC_TEMPLATES_BUCKET} does not exist."
+            echo "Run scripts/setup-public-bucket.sh once, then re-run this workflow."
+          fi
+
+      - name: Deploy to App Runner (create or update; race-safe)
         id: deploy
         env:
           IMAGE_URI_LATEST: ${{ env.IMAGE_URI_LATEST }}
@@ -104,10 +119,31 @@ jobs:
             SERVICE_ARN=$(echo "$CREATE_OUT" | python -c "import json,sys;print(json.load(sys.stdin)['Service']['ServiceArn'])")
             SERVICE_URL=$(echo "$CREATE_OUT" | python -c "import json,sys;print(json.load(sys.stdin)['Service']['ServiceUrl'])")
           else
-            echo "Service exists ($SERVICE_ARN). Triggering deployment..."
-            aws apprunner start-deployment \
+            STATUS=$(aws apprunner describe-service \
               --region "$AWS_REGION" \
-              --service-arn "$SERVICE_ARN" >/dev/null
+              --service-arn "$SERVICE_ARN" \
+              --query 'Service.Status' --output text)
+            echo "Service exists ($SERVICE_ARN) status=$STATUS"
+
+            case "$STATUS" in
+              RUNNING)
+                echo "Triggering explicit start-deployment..."
+                aws apprunner start-deployment \
+                  --region "$AWS_REGION" \
+                  --service-arn "$SERVICE_ARN" >/dev/null
+                ;;
+              OPERATION_IN_PROGRESS)
+                echo "Auto-deployment already in progress (AutoDeploymentsEnabled+ECR push race) — skipping explicit start-deployment."
+                ;;
+              CREATE_FAILED|DELETE_FAILED|DELETED|PAUSED)
+                echo "ERROR: service in unexpected state '$STATUS' — aborting deploy."
+                exit 1
+                ;;
+              *)
+                echo "Service status '$STATUS' — proceeding without explicit start-deployment."
+                ;;
+            esac
+
             SERVICE_URL=$(aws apprunner describe-service \
               --region "$AWS_REGION" \
               --service-arn "$SERVICE_ARN" \
@@ -129,5 +165,6 @@ jobs:
             echo "- Service ARN: \`${SERVICE_ARN}\`"
             echo "- Service URL: https://${SERVICE_URL}"
             echo "- Health: https://${SERVICE_URL}/api/health"
-            echo "- Analyze: \`curl -X POST https://${SERVICE_URL}/api/poc/analyze\`"
+            echo "- Setup info: https://${SERVICE_URL}/api/setup-info"
+            echo "- CFN template: https://${PUBLIC_TEMPLATES_BUCKET}.s3.${AWS_REGION}.amazonaws.com/customer-role.yaml"
           } >> "$GITHUB_STEP_SUMMARY"

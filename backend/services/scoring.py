@@ -17,6 +17,10 @@ math without reading code:
           REQUEST_MILLION_USD = $0.60   # not used in Phase 1
       dead_rule_count = rules with hit_count == 0 AND fms_managed == False
       waste_usd       = dead_rule_count * RULE_MONTHLY_USD
+
+  estimated_waste_breakdown (per audit run, list[dict]):
+      One entry per dead non-FMS rule:
+          {rule_name, monthly_usd: 1.00, reason}
 """
 from __future__ import annotations
 
@@ -41,10 +45,24 @@ def severity_score(
     return max(0, min(100, round(raw)))
 
 
+def _is_dead_customer(rule: Dict[str, Any]) -> bool:
+    return (rule.get("hit_count") or 0) == 0 and not rule.get("fms_managed", False)
+
+
 def estimated_waste_usd(rules: Iterable[Dict[str, Any]]) -> float:
-    dead_customer = [
-        r
-        for r in rules
-        if (r.get("hit_count") or 0) == 0 and not r.get("fms_managed", False)
-    ]
+    dead_customer = [r for r in rules if _is_dead_customer(r)]
     return round(len(dead_customer) * RULE_MONTHLY_USD, 2)
+
+
+def estimated_waste_breakdown(rules: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for r in rules:
+        if _is_dead_customer(r):
+            out.append(
+                {
+                    "rule_name": r["rule_name"],
+                    "monthly_usd": RULE_MONTHLY_USD,
+                    "reason": "Zero hits in 30 days; rule fee $1/month",
+                }
+            )
+    return out

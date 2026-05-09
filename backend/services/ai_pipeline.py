@@ -30,7 +30,11 @@ PASS1_SYSTEM = (
     "traffic statistics, explain in 2-3 plain English sentences what this rule "
     "is designed to block, whether it appears to be working based on the data, "
     "and any concerns. Return JSON with fields: explanation (string), working "
-    "(boolean), concerns (string or null)."
+    "(boolean), concerns (string or null). "
+    "When generating the `working` boolean: set false if `hit_count==0` and "
+    "the rule's design implies it should be firing (block patterns, IP blocks, "
+    "header matches). Only set true for 0-hit rules that are intentionally "
+    "passive (e.g. rate-based rules below threshold)."
 )
 
 PASS2_SYSTEM = (
@@ -51,6 +55,14 @@ PASS2_SYSTEM = (
     "hits or concerns, use `type='fms_review'`, `severity='low'`, and "
     "recommendation copy stating the rule is controlled by a delegated admin "
     "account and should be flagged for review with the central security team."
+    "\n\n"
+    "CONSISTENCY REQUIREMENT: every rule with hit_count==0 AND fms_managed==false "
+    "MUST be classified into exactly one of: `dead_rule` (default for any rule "
+    "that was clearly designed to fire, e.g. block patterns or known-bad "
+    "headers), `bypass_candidate` (only when there is positive evidence a "
+    "bypass is plausible), or `quick_win` (only when redundant with another "
+    "rule). Do not silently omit such rules. If the rule's purpose is unclear, "
+    "default to `dead_rule`."
 )
 
 _client_singleton: Optional[OpenAI] = None

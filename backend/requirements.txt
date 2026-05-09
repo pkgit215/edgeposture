@@ -8,3 +8,5 @@ pymongo>=4.7
 pytest
 pytest-asyncio
 httpx
+moto>=5
+mongomock>=4.3

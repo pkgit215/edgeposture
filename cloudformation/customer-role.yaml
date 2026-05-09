@@ -1,0 +1,85 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  RuleIQ — Customer audit role.
+  Creates an IAM role that the RuleIQ App Runner instance role can assume
+  via STS to perform read-only WAFv2 + CloudWatch Logs + FMS audits.
+  No data is written back to your account; no permissions are granted to
+  modify, create, or delete resources.
+
+Parameters:
+  RuleIQTrustedAccount:
+    Type: String
+    Default: "371126261144"
+    AllowedPattern: "^[0-9]{12}$"
+    Description: >
+      The AWS account ID that hosts the RuleIQ App Runner service.
+      Leave the default unless RuleIQ support tells you otherwise.
+
+  ExternalId:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+    MaxLength: 64
+    Description: >
+      Per-customer secret produced by GET /api/setup-info on your RuleIQ
+      tenant. Required on every sts:AssumeRole call. Treat it like a
+      credential — anyone holding it can request audits against your
+      account from the RuleIQ tenant.
+
+Resources:
+  RuleIQAuditRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: RuleIQAuditRole
+      Description: Read-only role for RuleIQ WAF audits.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: TrustRuleIQAppRunner
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${RuleIQTrustedAccount}:role/ruleiq-apprunner-instance"
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalId
+      Policies:
+        - PolicyName: RuleIQReadOnly
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: WAFv2Read
+                Effect: Allow
+                Action:
+                  - wafv2:ListWebACLs
+                  - wafv2:GetWebACL
+                  - wafv2:ListRuleGroups
+                  - wafv2:GetRuleGroup
+                  - wafv2:GetLoggingConfiguration
+                Resource: "*"
+              - Sid: LogsRead
+                Effect: Allow
+                Action:
+                  - logs:DescribeLogGroups
+                  - logs:FilterLogEvents
+                Resource: "*"
+              - Sid: S3Read
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource: "*"
+              - Sid: FMSRead
+                Effect: Allow
+                Action:
+                  - fms:ListPolicies
+                  - fms:GetPolicy
+                Resource: "*"
+
+Outputs:
+  RoleArn:
+    Description: Paste this ARN into the RuleIQ "Run audit" form.
+    Value: !GetAtt RuleIQAuditRole.Arn
+    Export:
+      Name: RuleIQAuditRoleArn

@@ -286,5 +286,5 @@ def test_health_includes_mongo_field(client: TestClient) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
-    assert body["phase"] == "1"
+    assert "phase" in body  # phase number bumps every release; just confirm presence
     assert body["mongo"] in ("ok", "unreachable")

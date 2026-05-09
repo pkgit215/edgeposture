@@ -1,4 +1,4 @@
-"""Pydantic v2 models for the RuleIQ persistence layer (Phase 1)."""
+"""Pydantic v2 models for the RuleIQ persistence layer (Phase 2)."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -18,8 +18,6 @@ def _utcnow() -> datetime:
 
 
 class _MongoModel(BaseModel):
-    """Base that maps API field `id` ↔ Mongo field `_id`."""
-
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
 
@@ -30,10 +28,17 @@ class Account(_MongoModel):
     last_audit_at: Optional[datetime] = None
 
 
+class WasteBreakdownEntry(BaseModel):
+    rule_name: str
+    monthly_usd: float
+    reason: str
+
+
 class AuditRun(_MongoModel):
     id: str = Field(alias="_id")
     account_id: str
     role_arn: Optional[str] = None
+    external_id: Optional[str] = None
     region: str = "us-east-1"
     status: AuditStatus = "pending"
     failure_reason: Optional[str] = None
@@ -44,12 +49,17 @@ class AuditRun(_MongoModel):
     rule_count: int = 0
     log_window_days: int = 30
     estimated_waste_usd: Optional[float] = None
+    estimated_waste_breakdown: Optional[List[WasteBreakdownEntry]] = None
+    fms_visibility: Optional[bool] = None
+    logging_available: Optional[bool] = None
+    data_source: Optional[Literal["aws", "fixture", "pending"]] = None
     seed: bool = False
 
 
 class AuditCreateRequest(BaseModel):
     account_id: str = Field(min_length=12, max_length=12)
     role_arn: Optional[str] = None
+    external_id: Optional[str] = None
     region: str = "us-east-1"
     log_window_days: int = 30
 
