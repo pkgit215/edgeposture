@@ -158,7 +158,10 @@ def _build_quick_create_url(template_url: str, external_id: str) -> str:
         f"&param_RuleIQTrustedAccount={APP_RUNNER_ACCOUNT_ID}"
         f"&param_ExternalId={quote(external_id)}"
     )
-    return f"{base}&{params}"
+    # The fragment after `quickcreate` is the SPA route's own query string —
+    # it MUST start with `?`, not `&`. With `&` the console lands on the
+    # stacks-list page instead of the Quick-Create form.
+    return f"{base}?{params}"
 
 
 @app.get("/api/setup-info")

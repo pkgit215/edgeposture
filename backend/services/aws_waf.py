@@ -13,6 +13,7 @@ Sampling policy for get_rule_stats:
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import time
@@ -28,6 +29,40 @@ DEFAULT_REGION = "us-east-1"
 LOG_EVENT_PAGE_SIZE = 10_000
 DEFAULT_MAX_EVENTS = 50_000
 DEFAULT_WINDOW_DAYS = 30
+
+
+# ---------- JSON normalization (boto3 → JSON-safe) ---------------------------
+
+
+def _normalize_for_json(obj: Any) -> Any:
+    """Recursively convert boto3 response values into JSON-safe primitives.
+
+    boto3's WAFv2 model returns several fields as Python `bytes` (notably
+    `ByteMatchStatement.SearchString` and any `IPSetForwardedIPConfig.Data`).
+    Those values can't be json-dumped for Mongo persistence or for the AI
+    prompt payload. This helper walks dicts/lists and:
+
+      - bytes  → utf-8 decoded string when valid; else base64-encoded ascii
+      - datetime → isoformat string
+      - everything else passed through
+
+    Apply at the boundary where boto3 dicts are first captured, so the rest
+    of the codebase only ever sees JSON-safe data.
+    """
+    if isinstance(obj, bytes):
+        try:
+            return obj.decode("utf-8")
+        except UnicodeDecodeError:
+            return base64.b64encode(obj).decode("ascii")
+    if isinstance(obj, dict):
+        return {k: _normalize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_normalize_for_json(v) for v in obj]
+    if isinstance(obj, tuple):
+        return [_normalize_for_json(v) for v in obj]
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    return obj
 
 
 # ---------- STS ---------------------------------------------------------------
@@ -78,7 +113,7 @@ def list_web_acls(session: boto3.Session, region: str) -> List[Dict[str, Any]]:
                 logger.warning("list_web_acls %s failed: %s", scope, exc)
                 break
             for acl in resp.get("WebACLs", []):
-                out.append({**acl, "Scope": scope})
+                out.append({**_normalize_for_json(acl), "Scope": scope})
             next_marker = resp.get("NextMarker")
             if not next_marker:
                 break
@@ -88,7 +123,12 @@ def list_web_acls(session: boto3.Session, region: str) -> List[Dict[str, Any]]:
 def get_web_acl_rules(
     session: boto3.Session, web_acl: Dict[str, Any]
 ) -> List[Dict[str, Any]]:
-    """Fetch a Web ACL and project its rules into RuleIQ rule dicts."""
+    """Fetch a Web ACL and project its rules into RuleIQ rule dicts.
+
+    boto3 returns ByteMatchStatement.SearchString (and a few IPSet/Forwarded
+    fields) as raw bytes. We normalize the entire Statement subtree to JSON
+    primitives here so downstream code never sees bytes.
+    """
     scope = web_acl.get("Scope", "REGIONAL")
     region = "us-east-1" if scope == "CLOUDFRONT" else web_acl.get("Region", DEFAULT_REGION)
     client = session.client("wafv2", region_name=region)
@@ -110,7 +150,7 @@ def get_web_acl_rules(
                 "rule_name": r["Name"],
                 "priority": r.get("Priority", 0),
                 "action": action,
-                "statement_json": r.get("Statement", {}),
+                "statement_json": _normalize_for_json(r.get("Statement", {})),
                 "override_action": override_action,
                 "fms_managed": bool(r.get("ManagedByFirewallManager", False)),
             }
@@ -148,12 +188,14 @@ def enrich_fms(
             resp = client.list_policies(**kwargs)
             for p in resp.get("PolicyList", []):
                 policies.append(
-                    {
-                        "PolicyId": p.get("PolicyId"),
-                        "PolicyName": p.get("PolicyName"),
-                        "ResourceType": p.get("ResourceType"),
-                        "SecurityServiceType": p.get("SecurityServiceType"),
-                    }
+                    _normalize_for_json(
+                        {
+                            "PolicyId": p.get("PolicyId"),
+                            "PolicyName": p.get("PolicyName"),
+                            "ResourceType": p.get("ResourceType"),
+                            "SecurityServiceType": p.get("SecurityServiceType"),
+                        }
+                    )
                 )
             next_token = resp.get("NextToken")
             if not next_token:

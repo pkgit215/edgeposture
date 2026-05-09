@@ -172,8 +172,15 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
 
         role_arn = run.get("role_arn")
         if _demo_mode() or not role_arn:
+            # Set data_source FIRST so a failure mid-load still reports correctly.
+            db["audit_runs"].update_one(
+                {"_id": audit_run_id}, {"$set": {"data_source": "fixture"}}
+            )
             rules, meta = _load_rules_from_fixtures()
         else:
+            db["audit_runs"].update_one(
+                {"_id": audit_run_id}, {"$set": {"data_source": "aws"}}
+            )
             rules, meta = _load_rules_from_aws(
                 account_id=run["account_id"],
                 role_arn=role_arn,

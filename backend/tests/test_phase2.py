@@ -452,6 +452,17 @@ def test_setup_info_returns_quick_create_url_with_external_id(client):
     assert body["inline_iam_json"]["Version"] == "2012-10-17"
 
 
+def test_setup_info_quick_create_uses_question_mark_separator(client):
+    """Regression: the SPA route's query string must start with `?`, not `&`.
+    With `&` the AWS console lands on the stacks-list page instead of the
+    Quick-Create form.
+    """
+    body = client.get("/api/setup-info").json()
+    url = body["cfn_quick_create_url"]
+    assert "quickcreate?templateURL=" in url, url
+    assert "quickcreate&templateURL=" not in url, url
+
+
 def test_setup_info_external_id_is_random(client):
     a = client.get("/api/setup-info").json()["external_id"]
     b = client.get("/api/setup-info").json()["external_id"]
@@ -489,3 +500,82 @@ def test_audit_create_request_accepts_external_id(client):
         },
     )
     assert resp.status_code == 202
+
+
+# ---------- _normalize_for_json (regression for "bytes is not JSON serializable") ----
+
+
+def test_normalize_for_json_handles_bytes_and_datetimes():
+    from datetime import datetime, timezone
+    payload = {
+        "SearchString": b"/admin/",                  # utf-8 → string
+        "BinaryBlob": b"\x80\x81\x82\xff",           # not utf-8 → base64
+        "Nested": [
+            {"FieldToMatch": {"UriPath": {}}},
+            b"raw-bytes",
+        ],
+        "Tuple": (b"a", b"b"),
+        "When": datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc),
+        "PassThrough": 42,
+    }
+    out = aws_waf._normalize_for_json(payload)
+    assert out["SearchString"] == "/admin/"
+    assert out["BinaryBlob"] == "gIGC/w=="           # base64 of 0x80 0x81 0x82 0xff
+    assert out["Nested"][0] == {"FieldToMatch": {"UriPath": {}}}
+    assert out["Nested"][1] == "raw-bytes"
+    assert out["Tuple"] == ["a", "b"]
+    assert out["When"] == "2026-02-16T12:00:00+00:00"
+    assert out["PassThrough"] == 42
+    # Round-trip: must JSON-serialize without error.
+    json.dumps(out)
+
+
+@mock_aws
+def test_get_web_acl_rules_normalizes_byte_match_statement(_patch, monkeypatch):
+    """Real boto3 returns ByteMatchStatement.SearchString as bytes — must be string after normalize."""
+    monkeypatch.setattr(aws_waf, "assume_role", lambda *a, **kw: boto3.Session())
+    role_arn, _ = _bootstrap_real_waf()  # creates acl-a (rules incl. BlockAdminPath ByteMatch)
+    session = boto3.Session()
+    acls = aws_waf.list_web_acls(session, "us-east-1")
+    target = next(a for a in acls if a["Name"] == "acl-a")
+    rules = aws_waf.get_web_acl_rules(session, target)
+
+    bm = next((r for r in rules if r["rule_name"] == "BlockAdminPath"), None)
+    assert bm is not None
+    stmt = bm["statement_json"]
+    search = stmt["ByteMatchStatement"]["SearchString"]
+    assert isinstance(search, str), f"expected str, got {type(search).__name__}"
+    assert search == "/admin/"
+    # Whole statement must JSON-serialize (no bytes anywhere)
+    json.dumps(stmt)
+
+
+def test_data_source_set_to_aws_before_load(_patch, monkeypatch):
+    """Even if the AWS load throws mid-flight, data_source must be 'aws' (not 'pending')."""
+    monkeypatch.delenv("DEMO_MODE", raising=False)
+
+    def boom(*a, **kw):
+        raise RuntimeError("simulated assume_role failure")
+    monkeypatch.setattr(aws_waf, "assume_role", boom)
+
+    audit_id = audit_mod.create_audit_run(
+        _patch, "111122223333",
+        role_arn="arn:aws:iam::111122223333:role/RuleIQAuditRole",
+        region="us-east-1", log_window_days=30, external_id="ext1",
+    )
+    audit_mod.run_audit_pipeline(audit_id, _patch)
+    run = _patch["audit_runs"].find_one({"_id": audit_id})
+    assert run["status"] == "failed"
+    assert run["data_source"] == "aws", (
+        f"expected data_source='aws' on real-path failure, got {run['data_source']!r}"
+    )
+
+
+def test_data_source_set_to_fixture_for_demo_mode(_patch, monkeypatch):
+    monkeypatch.setenv("DEMO_MODE", "true")
+    audit_id = audit_mod.create_audit_run(
+        _patch, "111122223333", "arn:fake", "us-east-1", 30, external_id="x"
+    )
+    audit_mod.run_audit_pipeline(audit_id, _patch)
+    run = _patch["audit_runs"].find_one({"_id": audit_id})
+    assert run["data_source"] == "fixture"
