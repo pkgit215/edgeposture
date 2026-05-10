@@ -82,11 +82,19 @@ def create_audit_run(
     db["accounts"].update_one(
         {"account_id": account_id},
         {
+            # last_audit_at MUST be in $set — it has to advance on every audit,
+            # not just on insert. role_arn likewise (re-runs may use a freshly
+            # rotated ARN). created_at + account_id stay in $setOnInsert so the
+            # natural-key field and original-creation timestamp never get
+            # overwritten on subsequent runs.
+            "$set": {
+                "role_arn": role_arn,
+                "last_audit_at": _utcnow(),
+            },
             "$setOnInsert": {
                 "account_id": account_id,
-                "role_arn": role_arn,
                 "created_at": _utcnow(),
-            }
+            },
         },
         upsert=True,
     )

@@ -226,9 +226,12 @@ def _serialize_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _upsert_account(db: Any, account_id: str, role_arn: Optional[str]) -> None:
-    """Phase 4.5 — record this account so future audits can pre-fill the
-    Role ARN and the History page can offer a Re-run button. Best-effort:
-    failures are logged and never block the audit flow."""
+    """Phase 4.5 — DEPRECATED at v4.5.1. Account upsert is now canonical
+    inside `audit.create_audit_run` so the same `$set last_audit_at`
+    semantics apply on both `/api/audits` and `/api/audits/rerun` without
+    duplication. This wrapper is kept as a safety belt: if `audit.py` is
+    later refactored, the explicit call site in `create_audit` still
+    advances `last_audit_at`. Best-effort, never blocks."""
     if not role_arn or not tenant_mod.is_valid_account_id(account_id):
         return
     try:

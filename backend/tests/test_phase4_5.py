@@ -84,6 +84,50 @@ def test_post_audits_upserts_account_and_advances_last_audit_at(client, db):
     assert second["last_audit_at"] >= last_at_first
 
 
+def test_last_audit_at_strictly_advances_across_subsequent_audits(client, db):
+    """Regression for v4.5.1: `last_audit_at` was stuck on the first value
+    because it lived in `$setOnInsert`. This test asserts the field strictly
+    advances between successive POST /api/audits calls AND that GET
+    /api/accounts/{id} surfaces the new value."""
+    r1 = client.post(
+        "/api/audits",
+        json={"account_id": ACCOUNT, "role_arn": ROLE_ARN, "region": "us-east-1"},
+    )
+    assert r1.status_code == 202
+    t1 = client.get(f"/api/accounts/{ACCOUNT}").json()["last_audit_at"]
+    assert t1 is not None
+
+    time.sleep(0.05)
+
+    r2 = client.post(
+        "/api/audits",
+        json={"account_id": ACCOUNT, "role_arn": ROLE_ARN, "region": "us-east-1"},
+    )
+    assert r2.status_code == 202
+    t2 = client.get(f"/api/accounts/{ACCOUNT}").json()["last_audit_at"]
+    assert t2 is not None
+    # ISO-8601 strings sort lexicographically by time when both are UTC.
+    assert t2 > t1, f"last_audit_at did not advance: {t1} → {t2}"
+
+
+def test_last_audit_at_strictly_advances_on_rerun(client, db):
+    """Same regression on the /api/audits/rerun path."""
+    client.post(
+        "/api/audits",
+        json={"account_id": ACCOUNT, "role_arn": ROLE_ARN, "region": "us-east-1"},
+    )
+    t1 = client.get(f"/api/accounts/{ACCOUNT}").json()["last_audit_at"]
+
+    time.sleep(0.05)
+
+    rerun = client.post(
+        "/api/audits/rerun", json={"account_id": ACCOUNT, "region": "us-east-1"}
+    )
+    assert rerun.status_code == 202
+    t2 = client.get(f"/api/accounts/{ACCOUNT}").json()["last_audit_at"]
+    assert t2 > t1, f"rerun did not advance last_audit_at: {t1} → {t2}"
+
+
 def test_post_audits_demo_mode_does_not_set_role_arn(client, db):
     """No role_arn in request → existing audit.py upserts an account row
     with role_arn=None. /api/audits/rerun on this account must 404."""
