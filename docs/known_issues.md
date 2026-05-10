@@ -25,7 +25,7 @@ linking back to the originating phase.
 The deterministic per-tenant ExternalId is computed as
 `HMAC-SHA256(EXTERNAL_ID_SECRET, account_id)[:32]`. The secret lives in AWS
 Secrets Manager at
-`arn:aws:secretsmanager:us-east-1:371126261144:secret:ruleiq/external-id-secret`
+`arn:aws:secretsmanager:us-east-1:<ACCOUNT_ID>:secret:ruleiq/external-id-secret`
 and is injected into App Runner as an env var via `RuntimeEnvironmentSecrets`.
 
 **Bootstrap (one-time):** run `scripts/setup-external-id-secret.sh`. It
@@ -57,3 +57,35 @@ constant and logs a `WARNING`. The app stays up; ExternalIds become stable
 for the lifetime of that one process and rotate at every restart. This is
 fine for local dev but visibly broken in prod — fix the wiring instead of
 ignoring the warning.
+
+## Privacy & secret hygiene
+
+AWS account IDs are not classified as secrets per the [AWS docs on account
+identifiers](https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-identifiers.html)
+— they appear in every customer-facing ARN and are recoverable from any IAM
+trust policy you publish. We still **mask them in our tooling output**
+(runbooks, log lines, error strings, generated docs) as `<ACCOUNT_ID>` or
+`371xxxxxxx44`. This keeps screenshots, support tickets, and pasted runbook
+snippets from leaking the operator's identity any more than necessary.
+
+What is masked:
+- README snippets, runbook entries, Cloud9 copy-paste blocks
+- Doc-file references to deployer / instance / access role ARNs
+- Bootstrap script `echo` lines (the script's *functional* defaults still
+  carry the real account ID — it is needed to construct the right ARN at
+  runtime; this is config, not output).
+
+What is NOT masked (and why):
+- `.github/workflows/deploy.yml` — App Runner / ECR / IAM ARNs are required
+  for the deploy itself.
+- `cloudformation/customer-role.yaml` — the trust policy needs the literal
+  RuleIQ account ID so customers' roles know whom to trust.
+- Test fixtures (`backend/fixtures/waf_rules.json`) — fixture rule ARNs use
+  a placeholder account so the tests don't depend on a real account.
+- Source code env-var defaults (e.g. `RULEIQ_APP_RUNNER_ACCOUNT_ID`
+  fallback) — overridable at deploy time; documented behavior.
+
+Treat the `EXTERNAL_ID_SECRET` and the OpenAI / Mongo secrets as actual
+secrets — those live in Secrets Manager and never appear in any human-facing
+output.
+

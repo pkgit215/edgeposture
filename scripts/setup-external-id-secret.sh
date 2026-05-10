@@ -23,7 +23,7 @@ INLINE_POLICY_NAME="AllowReadExternalIdSecret"
 SECRET_ARN_PREFIX="arn:aws:secretsmanager:${REGION}:${ACCOUNT_ID}:secret:${SECRET_NAME}"
 
 echo "==> Region:       $REGION"
-echo "==> Account:      $ACCOUNT_ID"
+echo "==> Account:      ***...${ACCOUNT_ID: -4}"
 echo "==> Secret name:  $SECRET_NAME"
 echo "==> Role:         $INSTANCE_ROLE"
 echo

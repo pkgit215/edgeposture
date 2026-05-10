@@ -5,8 +5,10 @@ openai>=1.40
 tenacity
 pydantic>=2
 pymongo>=4.7
+reportlab>=4.2,<4.3
 pytest
 pytest-asyncio
 httpx
 moto>=5
 mongomock>=4.3
+pypdf>=5

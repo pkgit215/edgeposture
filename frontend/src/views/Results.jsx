@@ -104,17 +104,20 @@ export default function Results({ auditId, onGoConnect }) {
 
   if (!run || run.status === "pending" || run.status === "running") {
     return (
-      <div
-        data-testid="results-progress"
-        className="rounded-xl border border-slate-200 bg-white p-12 text-center"
-      >
-        <Spinner />
-        <p className="mt-4 text-sm text-slate-600">
-          Audit status: <span className="font-medium">{run?.status || "pending"}</span>
-        </p>
-        <p className="mt-1 text-xs text-slate-500">
-          Elapsed: {elapsed}s. You can switch to History in the meantime.
-        </p>
+      <div className="space-y-6">
+        <ResultsHeader auditId={auditId} run={run} />
+        <div
+          data-testid="results-progress"
+          className="rounded-xl border border-slate-200 bg-white p-12 text-center"
+        >
+          <Spinner />
+          <p className="mt-4 text-sm text-slate-600">
+            Audit status: <span className="font-medium">{run?.status || "pending"}</span>
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Elapsed: {elapsed}s. You can switch to History in the meantime.
+          </p>
+        </div>
       </div>
     );
   }
@@ -157,6 +160,7 @@ export default function Results({ auditId, onGoConnect }) {
 
   return (
     <div className="space-y-8">
+      <ResultsHeader auditId={auditId} run={run} />
       <SummaryBar
         run={run}
         rulesCount={rules?.length || 0}
@@ -174,6 +178,54 @@ export default function Results({ auditId, onGoConnect }) {
       {run.estimated_waste_breakdown && run.estimated_waste_breakdown.length > 0 && (
         <WasteBreakdown breakdown={run.estimated_waste_breakdown} total={run.estimated_waste_usd} />
       )}
+    </div>
+  );
+}
+
+function ResultsHeader({ auditId, run }) {
+  const status = run?.status || "pending";
+  const isComplete = status === "complete";
+  const downloadUrl = `/api/audits/${auditId}/report.pdf`;
+  const onDownload = () => {
+    if (!isComplete) return;
+    window.location.href = downloadUrl;
+  };
+  return (
+    <div
+      data-testid="results-header"
+      className="flex items-center justify-between gap-4"
+    >
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          Audit Results
+        </h1>
+        <p className="mt-1 text-xs text-slate-500 font-mono">
+          {auditId} · status: {status}
+        </p>
+      </div>
+      <button
+        type="button"
+        data-testid="download-pdf-btn"
+        onClick={onDownload}
+        disabled={!isComplete}
+        title={
+          isComplete
+            ? "Download PDF report"
+            : "Audit must finish before report is available"
+        }
+        className="inline-flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          aria-hidden="true"
+        >
+          <path d="M10 3a1 1 0 0 1 1 1v7.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4 4a1 1 0 0 1-1.414 0l-4-4a1 1 0 0 1 1.414-1.414L9 11.586V4a1 1 0 0 1 1-1zm-7 13a1 1 0 1 1 0 2h14a1 1 0 1 1 0-2H3z" />
+        </svg>
+        Download Report (PDF)
+      </button>
     </div>
   );
 }

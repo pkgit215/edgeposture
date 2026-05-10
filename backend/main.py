@@ -16,12 +16,13 @@ from urllib.parse import quote
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from models import AuditCreateRequest
 from services import audit as audit_mod
 from services import db as db_mod
+from services import pdf_report as pdf_mod
 from services import seed as seed_mod
 from services import tenant as tenant_mod
 from services.ai_pipeline import run_pipeline
@@ -308,6 +309,52 @@ def get_audit_findings(audit_id: str) -> List[Dict[str, Any]]:
         .sort("severity_score", -1)
     )
     return [_serialize_doc(d) for d in cursor]
+
+
+@app.get("/api/audits/{audit_id}/report.pdf")
+def get_audit_report_pdf(audit_id: str) -> Response:
+    """Phase 4 — render the executive PDF report for a complete audit run."""
+    db = db_mod.get_db()
+    run = db["audit_runs"].find_one({"_id": audit_id})
+    if not run:
+        raise HTTPException(status_code=404, detail="audit not found")
+    status = run.get("status")
+    if status != "complete":
+        return Response(
+            content=json.dumps(
+                {"error": "Audit not yet complete", "status": status}
+            ),
+            status_code=409,
+            media_type="application/json",
+        )
+    rules = list(
+        db["rules"]
+        .find({"audit_run_id": audit_id})
+        .sort([("web_acl_name", 1), ("priority", 1)])
+    )
+    findings = list(
+        db["findings"]
+        .find({"audit_run_id": audit_id})
+        .sort("severity_score", -1)
+    )
+    pdf_bytes = pdf_mod.render_audit_pdf(run, rules, findings)
+    completed = run.get("completed_at") or run.get("created_at")
+    if isinstance(completed, datetime):
+        ymd = completed.strftime("%Y%m%d")
+    else:
+        ymd = datetime.now().strftime("%Y%m%d")
+    account = run.get("account_id") or "unknown"
+    filename = f"ruleiq-audit-{account}-{ymd}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
+    )
+
+
 
 
 

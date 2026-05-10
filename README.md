@@ -80,13 +80,13 @@ When `RULEIQ_SPA_DIST` (default `/app/static` in the container) points to a dire
 | `OPENAI_API_KEY`                  | Overrides Secrets Manager fetch                         | unset                |
 | `MONGODB_URI`                     | Overrides Secrets Manager fetch                         | unset                |
 | `DEMO_MODE`                       | When `true`, audits use fixtures even with `role_arn`   | `true`               |
-| `RULEIQ_APP_RUNNER_ACCOUNT_ID`    | Account that hosts RuleIQ; baked into CFN trust policy  | `371126261144`       |
+| `RULEIQ_APP_RUNNER_ACCOUNT_ID`    | Account that hosts RuleIQ; baked into CFN trust policy  | `<ACCOUNT_ID>`       |
 | `RULEIQ_PUBLIC_TEMPLATES_BUCKET`  | Public S3 bucket holding `customer-role.yaml`           | `ruleiq-public-templates-<account>` |
 | `PORT`                            | uvicorn port                                            | `8080`               |
 
 ## Phase 2 — running a real audit
 
-End-to-end onboarding sequence. Run **once** in CloudShell with admin AWS creds for the RuleIQ account (`371126261144`):
+End-to-end onboarding sequence. Run **once** in CloudShell with admin AWS creds for the RuleIQ account (`<ACCOUNT_ID>`):
 
 ```bash
 # 1. Public-read S3 bucket for the CFN template
@@ -98,7 +98,7 @@ bash scripts/grant-deployer-s3-perm.sh
 
 Then push Phase 2 from your Cloud9 repo (commands at the bottom of this README). The GHA workflow will:
 - Build & push the new image to ECR
-- Sync `cloudformation/customer-role.yaml` to `s3://ruleiq-public-templates-371126261144/customer-role.yaml`
+- Sync `cloudformation/customer-role.yaml` to `s3://ruleiq-public-templates-<ACCOUNT_ID>/customer-role.yaml`
 - Trigger an App Runner deploy if no auto-deploy is already in flight (race fix below)
 
 Once App Runner is `RUNNING`, build the disposable test WAF + seed traffic in the **target audit account** (can be the same account or a different one — the role trust policy uses ExternalId, not account-anchoring):
@@ -148,11 +148,11 @@ FMS-managed rules (`fms_managed=true`) are owned by a delegated admin account an
 
 | Resource         | ARN / value                                                                  |
 |------------------|------------------------------------------------------------------------------|
-| Account / region | `371126261144` / `us-east-1`                                                 |
-| ECR repo         | `371126261144.dkr.ecr.us-east-1.amazonaws.com/ruleiq`                        |
-| Deployer role    | `arn:aws:iam::371126261144:role/ruleiq-github-deployer`                      |
-| Instance role    | `arn:aws:iam::371126261144:role/ruleiq-apprunner-instance`                   |
-| Access role      | `arn:aws:iam::371126261144:role/ruleiq-apprunner-ecr-access`                 |
-| OpenAI secret    | `arn:aws:secretsmanager:us-east-1:371126261144:secret:ruleiq/openai`         |
-| Mongo secret     | `arn:aws:secretsmanager:us-east-1:371126261144:secret:ruleiq/mongodb`        |
-| Public templates | `s3://ruleiq-public-templates-371126261144/customer-role.yaml`               |
+| Account / region | `<ACCOUNT_ID>` / `us-east-1`                                                 |
+| ECR repo         | `<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/ruleiq`                        |
+| Deployer role    | `arn:aws:iam::<ACCOUNT_ID>:role/ruleiq-github-deployer`                      |
+| Instance role    | `arn:aws:iam::<ACCOUNT_ID>:role/ruleiq-apprunner-instance`                   |
+| Access role      | `arn:aws:iam::<ACCOUNT_ID>:role/ruleiq-apprunner-ecr-access`                 |
+| OpenAI secret    | `arn:aws:secretsmanager:us-east-1:<ACCOUNT_ID>:secret:ruleiq/openai`         |
+| Mongo secret     | `arn:aws:secretsmanager:us-east-1:<ACCOUNT_ID>:secret:ruleiq/mongodb`        |
+| Public templates | `s3://ruleiq-public-templates-<ACCOUNT_ID>/customer-role.yaml`               |
