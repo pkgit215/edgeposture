@@ -17,6 +17,8 @@ from urllib.parse import quote
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from models import AuditCreateRequest
 from services import audit as audit_mod
@@ -41,8 +43,14 @@ PUBLIC_TEMPLATES_BUCKET = os.environ.get(
 )
 CFN_TEMPLATE_KEY = "customer-role.yaml"
 CFN_TEMPLATE_REGION = "us-east-1"
+# SPA dist directory — the multi-stage Dockerfile copies the Vite build here.
+# Override via RULEIQ_SPA_DIST for local dev / tests.
+SPA_DIST_DIR = Path(
+    os.environ.get("RULEIQ_SPA_DIST", "/app/static")
+)
 logger.info(
-    "RuleIQ Phase 2 starting | DEMO_MODE=%s TESTING=%s", DEMO_MODE, TESTING
+    "RuleIQ Phase 3 starting | DEMO_MODE=%s TESTING=%s SPA_DIST=%s",
+    DEMO_MODE, TESTING, SPA_DIST_DIR,
 )
 
 FIXTURES_PATH = Path(__file__).parent / "fixtures" / "waf_rules.json"
@@ -58,8 +66,8 @@ def load_fixture_rules() -> List[Dict[str, Any]]:
 
 app = FastAPI(
     title="RuleIQ",
-    description="AI-powered AWS WAF audit tool — Phase 2",
-    version="0.3.0",
+    description="AI-powered AWS WAF audit tool — Phase 3",
+    version="0.4.0",
     openapi_url="/api/openapi.json",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -92,7 +100,7 @@ def _startup() -> None:
 def health() -> Dict[str, str]:
     return {
         "status": "ok",
-        "phase": "2",
+        "phase": "3",
         "mongo": "ok" if db_mod.ping() else "unreachable",
     }
 
@@ -223,13 +231,29 @@ def create_audit(
 @app.get("/api/audits")
 def list_audits() -> List[Dict[str, Any]]:
     db = db_mod.get_db()
-    cursor = (
+    runs = list(
         db["audit_runs"]
         .find({}, {})
         .sort([("created_at", -1), ("_id", -1)])
         .limit(50)
     )
-    return [_serialize_run(d) for d in cursor]
+    # One aggregate query for findings_count keyed by audit_run_id (no N+1).
+    run_ids = [r["_id"] for r in runs]
+    counts: Dict[str, int] = {}
+    if run_ids:
+        cursor = db["findings"].aggregate(
+            [
+                {"$match": {"audit_run_id": {"$in": run_ids}}},
+                {"$group": {"_id": "$audit_run_id", "n": {"$sum": 1}}},
+            ]
+        )
+        counts = {doc["_id"]: doc["n"] for doc in cursor}
+    out: List[Dict[str, Any]] = []
+    for r in runs:
+        s = _serialize_run(r)
+        s["findings_count"] = counts.get(r["_id"], 0)
+        out.append(s)
+    return out
 
 
 @app.get("/api/audits/{audit_id}")
@@ -238,7 +262,11 @@ def get_audit(audit_id: str) -> Dict[str, Any]:
     doc = db["audit_runs"].find_one({"_id": audit_id})
     if not doc:
         raise HTTPException(status_code=404, detail="audit not found")
-    return _serialize_run(doc)
+    out = _serialize_run(doc)
+    out["findings_count"] = db["findings"].count_documents(
+        {"audit_run_id": audit_id}
+    )
+    return out
 
 
 @app.get("/api/audits/{audit_id}/rules")
@@ -257,3 +285,48 @@ def get_audit_findings(audit_id: str) -> List[Dict[str, Any]]:
         .sort("severity_score", -1)
     )
     return [_serialize_doc(d) for d in cursor]
+
+
+# ---------- SPA static mount (Phase 3) ---------------------------------------
+# Conditional: only mount when the build directory exists. The multi-stage
+# Dockerfile copies the Vite build to /app/static. In local dev the directory
+# is absent and the SPA simply isn't served — `/api/*` continues to work.
+# IMPORTANT: registered AFTER all `/api/*` routes so they take precedence.
+
+
+def _mount_spa_if_built(app_: FastAPI, dist_dir: Path) -> None:
+    index_path = dist_dir / "index.html"
+    if not index_path.is_file():
+        logger.info("SPA dist not present at %s — skipping mount", dist_dir)
+        return
+
+    assets_dir = dist_dir / "assets"
+    if assets_dir.is_dir():
+        app_.mount(
+            "/assets",
+            StaticFiles(directory=str(assets_dir)),
+            name="spa-assets",
+        )
+
+    @app_.get("/", include_in_schema=False)
+    def _spa_root() -> FileResponse:  # noqa: D401
+        return FileResponse(str(index_path))
+
+    @app_.get("/{full_path:path}", include_in_schema=False)
+    def _spa_catchall(full_path: str) -> FileResponse:
+        # Never shadow API routes; FastAPI matches `/api/*` first because they
+        # were registered above this catch-all.
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404)
+        candidate = dist_dir / full_path
+        if candidate.is_file():
+            return FileResponse(str(candidate))
+        # SPA fallback — serve index.html so client-side state navigation works
+        # on direct URL hits / refresh.
+        return FileResponse(str(index_path))
+
+    logger.info("SPA mounted from %s", dist_dir)
+
+
+_mount_spa_if_built(app, SPA_DIST_DIR)
+

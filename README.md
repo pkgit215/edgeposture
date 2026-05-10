@@ -6,14 +6,14 @@ AI-powered AWS WAF audit tool. Two-pass LLM pipeline that explains every WAF rul
 
 - **Phase 0** (deployed): FastAPI shell, fixture rules, two-pass pipeline.
 - **Phase 1** (deployed): Audit lifecycle, MongoDB persistence, scoring, demo seed.
-- **Phase 2** (this build): real boto3 reads via cross-account `sts.assume_role`, customer onboarding via Quick-Create CFN, GHA workflow race fix, prompt tuning.
-- Phase 3 (next): React + Tailwind frontend.
+- **Phase 2** (deployed): real boto3 reads via cross-account `sts.assume_role`, customer onboarding via Quick-Create CFN, GHA workflow race fix, prompt tuning.
+- **Phase 3** (this build): React + Tailwind + Vite frontend (Connect / Results / History views), multi-stage Dockerfile that bakes the built SPA into the runtime image, `findings_count` aggregation on `/api/audits` (single `$group` query — no N+1).
 
 ## Repository layout
 
 ```
 backend/
-  main.py                       # FastAPI app
+  main.py                       # FastAPI app + conditional SPA mount
   models.py                     # Pydantic v2
   fixtures/waf_rules.json
   services/
@@ -27,27 +27,51 @@ backend/
   tests/
     test_phase0.py              # 7 tests
     test_phase1.py              # 9 tests
-    test_phase2.py              # 11 tests
+    test_phase2.py              # 16 tests
+    test_phase3.py              # 6 tests (findings_count + SPA mount)
   requirements.txt
-cloudformation/customer-role.yaml  # IAM role customers create via Quick-Create
+frontend/                       # Phase 3 — React 18 + Vite 5 + Tailwind 3
+  index.html
+  vite.config.js
+  tailwind.config.js
+  src/
+    App.jsx                     # state-based view router (no react-router)
+    api.js                      # tiny fetch wrapper, same-origin in prod
+    views/
+      Connect.jsx               # Quick-Create CFN flow + role ARN form
+      Results.jsx               # poll audit, summary tiles, findings + rules table
+      History.jsx               # prior audits w/ findings_count column
+    __tests__/
+      connect.test.jsx          # 2 vitest + RTL tests
+cloudformation/customer-role.yaml
 scripts/
-  setup-public-bucket.sh        # one-time S3 bucket for CFN template hosting
-  grant-deployer-s3-perm.sh     # one-time IAM perm for GHA → that bucket
-  setup-test-waf.sh             # builds a disposable WAF + seeds traffic
-  teardown-test-waf.sh          # tears it all down
+  setup-public-bucket.sh
+  grant-deployer-s3-perm.sh
+  setup-test-waf.sh
+  teardown-test-waf.sh
 docs/known_issues.md
-Dockerfile
+Dockerfile                      # multi-stage: node:20 → python:3.12-slim
 .github/workflows/deploy.yml
 ```
 
 ## Local development
 
 ```bash
+# Backend
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-RULEIQ_TESTING=1 pytest tests/        # 27 tests, all green; mocks OpenAI + Mongo + AWS
+RULEIQ_TESTING=1 pytest tests/        # 38 tests, all green; mocks OpenAI + Mongo + AWS
+
+# Frontend (Phase 3)
+cd ../frontend
+yarn install
+yarn dev                              # http://localhost:3000  (proxies via VITE_API_BASE)
+yarn build                            # writes dist/ — what the runtime image serves
+yarn test                             # vitest + React Testing Library
 ```
+
+When `RULEIQ_SPA_DIST` (default `/app/static` in the container) points to a directory containing `index.html`, FastAPI mounts it at `/`. API routes (`/api/*`) are registered first and therefore always win over the SPA catch-all. If the directory is missing the mount is silently skipped, so `pytest` and pure-API local dev are unaffected.
 
 ### Environment variables (deployed)
 
