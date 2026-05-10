@@ -19,8 +19,12 @@ export const api = {
     const q = accountId ? `?account_id=${encodeURIComponent(accountId)}` : "";
     return request(`/api/setup-info${q}`);
   },
+  getAccount: (accountId) => request(`/api/accounts/${encodeURIComponent(accountId)}`),
+  listAccounts: () => request("/api/accounts"),
   createAudit: (body) =>
     request("/api/audits", { method: "POST", body: JSON.stringify(body) }),
+  rerunAudit: (body) =>
+    request("/api/audits/rerun", { method: "POST", body: JSON.stringify(body) }),
   listAudits: () => request("/api/audits"),
   getAudit: (id) => request(`/api/audits/${id}`),
   getAuditRules: (id) => request(`/api/audits/${id}/rules`),

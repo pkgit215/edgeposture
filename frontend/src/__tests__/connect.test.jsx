@@ -127,4 +127,58 @@ describe("Connect view — deterministic ExternalId flow", () => {
     expect(body.role_arn).toBeUndefined();
     expect(body.account_id).toBe("123456789012");
   });
+
+  it("pre-fills the Role ARN when /api/accounts/{id} returns a saved record", async () => {
+    const SAVED_ARN = "arn:aws:iam::123456789012:role/RuleIQAuditRoleSaved";
+    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes("/api/accounts/123456789012")) {
+        return {
+          ok: true,
+          json: async () => ({
+            account_id: "123456789012",
+            role_arn: SAVED_ARN,
+            created_at: "2026-05-09T12:00:00Z",
+            last_audit_at: "2026-05-10T13:00:00Z",
+          }),
+        };
+      }
+      if (u.includes("account_id=")) {
+        return { ok: true, json: async () => SETUP_FOR_ACCOUNT };
+      }
+      return { ok: true, json: async () => SETUP_BASE };
+    });
+    const user = userEvent.setup();
+    render(<Connect onAuditStarted={() => {}} />);
+    await user.type(
+      await screen.findByTestId("account-id-input"),
+      "123456789012"
+    );
+    const arnInput = await screen.findByTestId("role-arn-input");
+    await waitFor(() => expect(arnInput).toHaveValue(SAVED_ARN));
+    expect(screen.getByTestId("saved-account-badge")).toBeInTheDocument();
+  });
+
+  it("leaves the Role ARN empty when /api/accounts/{id} returns 404", async () => {
+    vi.spyOn(global, "fetch").mockImplementation(async (url) => {
+      const u = String(url);
+      if (u.includes("/api/accounts/123456789012")) {
+        return { ok: false, status: 404, statusText: "Not Found", json: async () => ({}) };
+      }
+      if (u.includes("account_id=")) {
+        return { ok: true, json: async () => SETUP_FOR_ACCOUNT };
+      }
+      return { ok: true, json: async () => SETUP_BASE };
+    });
+    const user = userEvent.setup();
+    render(<Connect onAuditStarted={() => {}} />);
+    await user.type(
+      await screen.findByTestId("account-id-input"),
+      "123456789012"
+    );
+    const arnInput = await screen.findByTestId("role-arn-input");
+    // role-arn should remain empty; saved-account badge should not show.
+    expect(arnInput).toHaveValue("");
+    expect(screen.queryByTestId("saved-account-badge")).toBeNull();
+  });
 });

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api.js";
+import { formatLocalTimestamp } from "../lib/datetime.js";
 
 const ACCOUNT_ID_RE = /^\d{12}$/;
 const ROLE_ARN_RE = /^arn:aws:iam::(\d{12}):role\/.+$/;
@@ -21,6 +22,7 @@ export default function Connect({ onAuditStarted }) {
   // info = setup-info response with the account_id, includes external_id + CFN URL
   const [info, setInfo] = useState(null);
   const [loadingInfo, setLoadingInfo] = useState(false);
+  const [savedAccount, setSavedAccount] = useState(null);
   const [roleArn, setRoleArn] = useState("");
   const [region, setRegion] = useState("us-east-1");
   const [error, setError] = useState(null);
@@ -34,20 +36,28 @@ export default function Connect({ onAuditStarted }) {
 
   const accountIdValid = ACCOUNT_ID_RE.test(accountId);
 
-  // Step 1: when a valid account_id is entered, fetch the deterministic
-  // ExternalId + CFN URL. Debounced via the setTimeout.
+  // Step 1: when a valid account_id is entered, fetch BOTH the deterministic
+  // ExternalId + CFN URL AND any saved account memory in parallel. Debounced.
   useEffect(() => {
     if (!accountIdValid) {
       setInfo(null);
+      setSavedAccount(null);
       return;
     }
     setLoadingInfo(true);
     setError(null);
     const handle = setTimeout(() => {
-      api
-        .setupInfo(accountId)
-        .then((resp) => {
+      Promise.all([
+        api.setupInfo(accountId),
+        api.getAccount(accountId).catch(() => null), // 404 is fine
+      ])
+        .then(([resp, saved]) => {
           setInfo(resp);
+          setSavedAccount(saved && saved.role_arn ? saved : null);
+          if (saved && saved.role_arn) {
+            // Pre-fill the role ARN from memory. User can still override.
+            setRoleArn((current) => (current ? current : saved.role_arn));
+          }
           setLoadingInfo(false);
         })
         .catch((e) => {
@@ -239,6 +249,17 @@ export default function Connect({ onAuditStarted }) {
               onChange={(e) => setRoleArn(e.target.value.trim())}
               className="w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
             />
+            {savedAccount && savedAccount.last_audit_at && (
+              <p
+                data-testid="saved-account-badge"
+                className="mt-1 text-xs text-slate-500"
+              >
+                <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-700">
+                  Pre-filled from memory
+                </span>{" "}
+                Last audit: {formatLocalTimestamp(savedAccount.last_audit_at)}
+              </p>
+            )}
             {roleArn && !arnOk && (
               <p
                 data-testid="role-arn-error"

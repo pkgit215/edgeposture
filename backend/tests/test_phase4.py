@@ -307,6 +307,9 @@ def test_critical_routes_are_registered():
         "/api/audits/{audit_id}/rules",
         "/api/audits/{audit_id}/findings",
         "/api/audits/{audit_id}/report.pdf",
+        "/api/audits/rerun",
+        "/api/accounts",
+        "/api/accounts/{account_id}",
     }
     missing = expected - paths
     assert not missing, f"Missing critical routes: {missing}"

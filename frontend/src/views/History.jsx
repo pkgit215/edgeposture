@@ -86,14 +86,17 @@ export default function History({ onOpenAudit }) {
                   <StatusPill status={a.status} />
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => onOpenAudit(a.id)}
-                    data-testid="history-view-btn"
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    View
-                  </button>
+                  <div className="inline-flex items-center gap-3">
+                    <RerunButton audit={a} />
+                    <button
+                      type="button"
+                      onClick={() => onOpenAudit(a.id)}
+                      data-testid="history-view-btn"
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      View
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -117,3 +120,55 @@ function StatusPill({ status }) {
     </span>
   );
 }
+
+function RerunButton({ audit }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const eligible =
+    audit.status === "complete" && audit.data_source === "aws";
+  if (!eligible) return null;
+
+  const onClick = async () => {
+    if (busy) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const out = await api.rerunAudit({
+        account_id: audit.account_id,
+        region: audit.region || "us-east-1",
+      });
+      setMsg(out.audit_run_id ? "Started — refresh to see status" : "Started");
+    } catch (e) {
+      // 404 from backend → no saved role.
+      if (e && /404|No saved role/i.test(String(e.message))) {
+        setMsg("No saved role — use Connect");
+      } else {
+        setMsg("Re-run failed");
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy}
+        data-testid="history-rerun-btn"
+        title="Re-run this audit using the saved role ARN"
+        className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {busy ? "Re-running…" : "Re-run"}
+      </button>
+      {msg && (
+        <span data-testid="history-rerun-msg" className="text-xs text-slate-500">
+          {msg}
+        </span>
+      )}
+    </span>
+  );
+}
+

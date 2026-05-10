@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -18,6 +18,7 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 from models import AuditCreateRequest
 from services import audit as audit_mod
@@ -101,7 +102,7 @@ def _startup() -> None:
 def health() -> Dict[str, str]:
     return {
         "status": "ok",
-        "phase": "4",
+        "phase": "4.5",
         "mongo": "ok" if db_mod.ping() else "unreachable",
     }
 
@@ -224,6 +225,45 @@ def _serialize_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _upsert_account(db: Any, account_id: str, role_arn: Optional[str]) -> None:
+    """Phase 4.5 — record this account so future audits can pre-fill the
+    Role ARN and the History page can offer a Re-run button. Best-effort:
+    failures are logged and never block the audit flow."""
+    if not role_arn or not tenant_mod.is_valid_account_id(account_id):
+        return
+    try:
+        now = datetime.now(timezone.utc)
+        db["accounts"].update_one(
+            {"account_id": account_id},
+            {
+                "$set": {
+                    "role_arn": role_arn,
+                    "last_audit_at": now,
+                },
+                "$setOnInsert": {
+                    "account_id": account_id,
+                    "created_at": now,
+                },
+            },
+            upsert=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("accounts upsert failed (account=%s): %s", account_id, exc)
+
+
+def _serialize_account(doc: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "account_id": doc.get("account_id"),
+        "role_arn": doc.get("role_arn"),
+        "created_at": doc.get("created_at").isoformat()
+        if isinstance(doc.get("created_at"), datetime)
+        else doc.get("created_at"),
+        "last_audit_at": doc.get("last_audit_at").isoformat()
+        if isinstance(doc.get("last_audit_at"), datetime)
+        else doc.get("last_audit_at"),
+    }
+
+
 @app.post("/api/audits", status_code=202)
 def create_audit(
     payload: AuditCreateRequest, background_tasks: BackgroundTasks
@@ -248,8 +288,90 @@ def create_audit(
         seed=False,
         external_id=external_id,
     )
+    _upsert_account(db, payload.account_id, payload.role_arn)
     background_tasks.add_task(audit_mod.run_audit_pipeline, audit_run_id, db)
     return {"audit_run_id": audit_run_id, "status": "pending"}
+
+
+# ---- Phase 4.5 account memory + re-run ------------------------------------
+
+
+class AuditRerunRequest(BaseModel):
+    account_id: str = Field(min_length=12, max_length=12)
+    region: str = "us-east-1"
+
+
+@app.post("/api/audits/rerun", status_code=202)
+def rerun_audit(
+    payload: AuditRerunRequest, background_tasks: BackgroundTasks
+) -> Dict[str, str]:
+    if not tenant_mod.is_valid_account_id(payload.account_id):
+        raise HTTPException(
+            status_code=400,
+            detail="account_id must be a 12-digit AWS account ID",
+        )
+    db = db_mod.get_db()
+    acc = db["accounts"].find_one({"account_id": payload.account_id})
+    if not acc or not acc.get("role_arn"):
+        return Response(
+            content=json.dumps(
+                {
+                    "error": "No saved role for this account. "
+                    "Use /api/audits with a role_arn."
+                }
+            ),
+            status_code=404,
+            media_type="application/json",
+        )
+    role_arn = acc["role_arn"]
+    external_id = tenant_mod.compute_external_id(payload.account_id)
+    audit_run_id = audit_mod.create_audit_run(
+        db=db,
+        account_id=payload.account_id,
+        role_arn=role_arn,
+        region=payload.region,
+        log_window_days=30,
+        seed=False,
+        external_id=external_id,
+    )
+    _upsert_account(db, payload.account_id, role_arn)
+    background_tasks.add_task(audit_mod.run_audit_pipeline, audit_run_id, db)
+    return {"audit_run_id": audit_run_id, "status": "pending"}
+
+
+@app.get("/api/accounts")
+def list_accounts() -> List[Dict[str, Any]]:
+    db = db_mod.get_db()
+    cursor = (
+        db["accounts"]
+        .find({}, {})
+        .sort([("last_audit_at", -1)])
+    )
+    out = []
+    for doc in cursor:
+        s = _serialize_account(doc)
+        # List view drops created_at to keep the response small.
+        out.append(
+            {
+                "account_id": s["account_id"],
+                "role_arn": s["role_arn"],
+                "last_audit_at": s["last_audit_at"],
+            }
+        )
+    return out
+
+
+@app.get("/api/accounts/{account_id}")
+def get_account(account_id: str) -> Dict[str, Any]:
+    if not tenant_mod.is_valid_account_id(account_id):
+        raise HTTPException(
+            status_code=422, detail="account_id must be a 12-digit AWS account ID"
+        )
+    db = db_mod.get_db()
+    doc = db["accounts"].find_one({"account_id": account_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="account not found")
+    return _serialize_account(doc)
 
 
 @app.get("/api/audits")
