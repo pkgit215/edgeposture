@@ -9,10 +9,9 @@ from __future__ import annotations
 import json
 import logging
 import os
-import secrets as _stdsecrets
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -24,6 +23,7 @@ from models import AuditCreateRequest
 from services import audit as audit_mod
 from services import db as db_mod
 from services import seed as seed_mod
+from services import tenant as tenant_mod
 from services.ai_pipeline import run_pipeline
 
 logging.basicConfig(
@@ -173,19 +173,32 @@ def _build_quick_create_url(template_url: str, external_id: str) -> str:
 
 
 @app.get("/api/setup-info")
-def setup_info() -> Dict[str, Any]:
-    external_id = _stdsecrets.token_hex(16)
+def setup_info(account_id: Optional[str] = None) -> Dict[str, Any]:
+    """Return onboarding artifacts for the customer's AWS account.
+
+    When `account_id` is missing or invalid, return the IAM policy + null
+    ExternalId / null CFN URL so the UI can prompt for the account ID first.
+    When valid, derive a deterministic ExternalId via HMAC and bake it into
+    the Quick-Create CFN URL.
+    """
     template_url = (
         f"https://{PUBLIC_TEMPLATES_BUCKET}.s3.{CFN_TEMPLATE_REGION}.amazonaws.com/"
         f"{CFN_TEMPLATE_KEY}"
     )
-    return {
+    base = {
         "app_runner_account_id": APP_RUNNER_ACCOUNT_ID,
-        "external_id": external_id,
         "cfn_template_url": template_url,
-        "cfn_quick_create_url": _build_quick_create_url(template_url, external_id),
         "inline_iam_json": _INLINE_IAM_POLICY,
+        "account_id": account_id,
+        "external_id": None,
+        "cfn_quick_create_url": None,
     }
+    if not account_id or not tenant_mod.is_valid_account_id(account_id):
+        return base
+    eid = tenant_mod.compute_external_id(account_id)
+    base["external_id"] = eid
+    base["cfn_quick_create_url"] = _build_quick_create_url(template_url, eid)
+    return base
 
 
 # ---------- Phase 1 audit lifecycle (extended) -------------------------------
@@ -215,6 +228,16 @@ def create_audit(
     payload: AuditCreateRequest, background_tasks: BackgroundTasks
 ) -> Dict[str, str]:
     db = db_mod.get_db()
+    # Real-AWS path: re-derive ExternalId server-side from account_id. The
+    # client never sends it. Tamper-proof, drift-proof.
+    external_id: Optional[str] = None
+    if payload.role_arn:
+        if not tenant_mod.is_valid_account_id(payload.account_id):
+            raise HTTPException(
+                status_code=400,
+                detail="account_id must be a 12-digit AWS account ID",
+            )
+        external_id = tenant_mod.compute_external_id(payload.account_id)
     audit_run_id = audit_mod.create_audit_run(
         db=db,
         account_id=payload.account_id,
@@ -222,7 +245,7 @@ def create_audit(
         region=payload.region,
         log_window_days=payload.log_window_days,
         seed=False,
-        external_id=payload.external_id,
+        external_id=external_id,
     )
     background_tasks.add_task(audit_mod.run_audit_pipeline, audit_run_id, db)
     return {"audit_run_id": audit_run_id, "status": "pending"}
@@ -285,6 +308,9 @@ def get_audit_findings(audit_id: str) -> List[Dict[str, Any]]:
         .sort("severity_score", -1)
     )
     return [_serialize_doc(d) for d in cursor]
+
+
+
 
 
 # ---------- SPA static mount (Phase 3) ---------------------------------------

@@ -59,7 +59,6 @@ class AuditRun(_MongoModel):
 class AuditCreateRequest(BaseModel):
     account_id: str = Field(min_length=12, max_length=12)
     role_arn: Optional[str] = None
-    external_id: Optional[str] = None
     region: str = "us-east-1"
     log_window_days: int = 30
 

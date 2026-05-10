@@ -188,3 +188,204 @@ def test_spa_mount_is_skipped_when_dist_missing(tmp_path, monkeypatch):
         assert client.get("/").status_code == 404
     finally:
         db_mod.clear_test_db()
+
+
+
+# ---------- Phase 3 hot-fix v2: deterministic per-account ExternalId --------
+
+
+def test_compute_external_id_is_deterministic(monkeypatch):
+    """Same secret + same account_id => same ExternalId, every call."""
+    from services import secrets as _secrets  # noqa: PLC0415
+    from services import tenant as _tenant  # noqa: PLC0415
+
+    monkeypatch.setenv("EXTERNAL_ID_SECRET", "a" * 64)
+    _secrets._reset_cache_for_tests()
+
+    a = _tenant.compute_external_id("123456789012")
+    b = _tenant.compute_external_id("123456789012")
+    c = _tenant.compute_external_id("123456789012")
+    assert a == b == c
+    assert len(a) == 32
+    # Hex characters only.
+    int(a, 16)
+
+
+def test_compute_external_id_depends_on_account_id(monkeypatch):
+    from services import secrets as _secrets  # noqa: PLC0415
+    from services import tenant as _tenant  # noqa: PLC0415
+
+    monkeypatch.setenv("EXTERNAL_ID_SECRET", "a" * 64)
+    _secrets._reset_cache_for_tests()
+
+    a = _tenant.compute_external_id("123456789012")
+    b = _tenant.compute_external_id("999988887777")
+    assert a != b
+
+
+def test_compute_external_id_depends_on_secret(monkeypatch):
+    from services import secrets as _secrets  # noqa: PLC0415
+    from services import tenant as _tenant  # noqa: PLC0415
+
+    monkeypatch.setenv("EXTERNAL_ID_SECRET", "a" * 64)
+    _secrets._reset_cache_for_tests()
+    a = _tenant.compute_external_id("123456789012")
+
+    monkeypatch.setenv("EXTERNAL_ID_SECRET", "b" * 64)
+    _secrets._reset_cache_for_tests()
+    b = _tenant.compute_external_id("123456789012")
+
+    assert a != b
+
+
+def test_compute_external_id_rejects_invalid_account_id(monkeypatch):
+    from services import secrets as _secrets  # noqa: PLC0415
+    from services import tenant as _tenant  # noqa: PLC0415
+
+    monkeypatch.setenv("EXTERNAL_ID_SECRET", "a" * 64)
+    _secrets._reset_cache_for_tests()
+
+    import pytest as _pytest  # noqa: PLC0415
+
+    for bad in ["", "abc", "12345", "1234567890123", "12345678901a"]:
+        with _pytest.raises(ValueError):
+            _tenant.compute_external_id(bad)
+
+
+def test_setup_info_no_account_id_returns_null_external_id(client):
+    resp = client.get("/api/setup-info")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["external_id"] is None
+    assert body["cfn_quick_create_url"] is None
+    assert body["account_id"] is None
+    # Policy + template URL still served so the UI can render Step 0 hints.
+    assert body["inline_iam_json"]["Version"] == "2012-10-17"
+    assert body["cfn_template_url"].endswith("/customer-role.yaml")
+
+
+def test_setup_info_invalid_account_id_returns_null_external_id(client):
+    body = client.get("/api/setup-info?account_id=not-an-account").json()
+    assert body["external_id"] is None
+    assert body["cfn_quick_create_url"] is None
+    body = client.get("/api/setup-info?account_id=1234").json()
+    assert body["external_id"] is None
+
+
+def test_setup_info_same_account_id_returns_same_external_id(client):
+    a = client.get("/api/setup-info?account_id=123456789012").json()["external_id"]
+    b = client.get("/api/setup-info?account_id=123456789012").json()["external_id"]
+    assert a == b
+    assert len(a) == 32
+
+
+def test_setup_info_different_account_ids_return_different_external_ids(client):
+    a = client.get("/api/setup-info?account_id=123456789012").json()["external_id"]
+    b = client.get("/api/setup-info?account_id=999988887777").json()["external_id"]
+    assert a != b
+    assert len(a) == 32 and len(b) == 32
+
+
+def test_audit_post_recomputes_external_id_server_side(client, db, monkeypatch):
+    """The submitted body must NOT contain external_id. The server recomputes
+    it from account_id and passes it to the audit pipeline."""
+    captured = {}
+
+    from services import audit as _audit_mod  # noqa: PLC0415
+
+    real_create = _audit_mod.create_audit_run
+
+    def spy(**kwargs):
+        captured.update(kwargs)
+        # Don't actually persist — return a fake id.
+        return "spy-audit-id"
+
+    monkeypatch.setattr(_audit_mod, "create_audit_run", spy)
+    monkeypatch.setattr(_audit_mod, "run_audit_pipeline", lambda *a, **kw: None)
+
+    expected = client.get(
+        "/api/setup-info?account_id=123456789012"
+    ).json()["external_id"]
+
+    resp = client.post(
+        "/api/audits",
+        json={
+            "account_id": "123456789012",
+            "role_arn": "arn:aws:iam::123456789012:role/RuleIQAuditRole",
+            "region": "us-east-1",
+        },
+    )
+    assert resp.status_code == 202, resp.text
+    assert captured["external_id"] == expected
+    # Sanity: real create_audit_run path still wired up correctly.
+    assert real_create is not _audit_mod.create_audit_run
+
+
+def test_audit_post_ignores_client_supplied_external_id(client, db, monkeypatch):
+    """Even if a malicious client sends external_id, it is ignored — the
+    server only ever uses the HMAC value."""
+    captured = {}
+
+    from services import audit as _audit_mod  # noqa: PLC0415
+
+    monkeypatch.setattr(
+        _audit_mod, "create_audit_run", lambda **kw: (captured.update(kw) or "id")
+    )
+    monkeypatch.setattr(_audit_mod, "run_audit_pipeline", lambda *a, **kw: None)
+
+    expected = client.get(
+        "/api/setup-info?account_id=123456789012"
+    ).json()["external_id"]
+
+    resp = client.post(
+        "/api/audits",
+        json={
+            "account_id": "123456789012",
+            "role_arn": "arn:aws:iam::123456789012:role/RuleIQAuditRole",
+            "external_id": "client-supplied-attack-value",
+            "region": "us-east-1",
+        },
+    )
+    assert resp.status_code == 202
+    # Server recomputed and OVERWROTE whatever the client sent.
+    assert captured["external_id"] == expected
+    assert captured["external_id"] != "client-supplied-attack-value"
+
+
+def test_audit_post_demo_mode_skips_external_id(client, db, monkeypatch):
+    """When role_arn is None (demo path), external_id is None — no STS call."""
+    captured = {}
+
+    from services import audit as _audit_mod  # noqa: PLC0415
+
+    monkeypatch.setattr(
+        _audit_mod, "create_audit_run", lambda **kw: (captured.update(kw) or "id")
+    )
+    monkeypatch.setattr(_audit_mod, "run_audit_pipeline", lambda *a, **kw: None)
+
+    resp = client.post(
+        "/api/audits",
+        json={
+            "account_id": "111122223333",
+            "role_arn": None,
+            "region": "us-east-1",
+        },
+    )
+    assert resp.status_code == 202
+    assert captured["external_id"] is None
+
+
+def test_audit_post_real_aws_rejects_invalid_account_id(client):
+    # Pydantic enforces 12-digit length; non-digits won't reach our validator.
+    # But valid-length-but-non-numeric is caught by us:
+    resp = client.post(
+        "/api/audits",
+        json={
+            "account_id": "abcdefghijkl",  # 12 chars but non-numeric
+            "role_arn": "arn:aws:iam::000000000000:role/RuleIQAuditRole",
+            "region": "us-east-1",
+        },
+    )
+    assert resp.status_code == 400
+    assert "account_id" in resp.json()["detail"]
+

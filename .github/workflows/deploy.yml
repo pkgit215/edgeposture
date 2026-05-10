@@ -17,6 +17,7 @@ env:
   INSTANCE_ROLE_ARN: arn:aws:iam::371126261144:role/ruleiq-apprunner-instance
   ACCESS_ROLE_ARN: arn:aws:iam::371126261144:role/ruleiq-apprunner-ecr-access
   PUBLIC_TEMPLATES_BUCKET: ruleiq-public-templates-371126261144
+  EXTERNAL_ID_SECRET_ARN: arn:aws:secretsmanager:us-east-1:371126261144:secret:ruleiq/external-id-secret
 
 jobs:
   deploy:
@@ -68,14 +69,11 @@ jobs:
           IMAGE_URI_LATEST: ${{ env.IMAGE_URI_LATEST }}
         run: |
           set -euo pipefail
-          SERVICE_ARN=$(aws apprunner list-services \
-            --region "$AWS_REGION" \
-            --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE'].ServiceArn | [0]" \
-            --output text)
 
-          if [ "$SERVICE_ARN" = "None" ] || [ -z "$SERVICE_ARN" ]; then
-            echo "Creating App Runner service '$APP_RUNNER_SERVICE'..."
-            cat > /tmp/source-config.json <<JSON
+          # Single source-of-truth for the runtime config — used by both
+          # create-service and update-service paths so existing deployments
+          # pick up env-var / secret changes on every push.
+          cat > /tmp/source-config.json <<JSON
           {
             "ImageRepository": {
               "ImageIdentifier": "$IMAGE_URI_LATEST",
@@ -84,6 +82,9 @@ jobs:
                 "Port": "8080",
                 "RuntimeEnvironmentVariables": {
                   "DEMO_MODE": "true"
+                },
+                "RuntimeEnvironmentSecrets": {
+                  "EXTERNAL_ID_SECRET": "$EXTERNAL_ID_SECRET_ARN"
                 }
               }
             },
@@ -93,6 +94,14 @@ jobs:
             }
           }
           JSON
+
+          SERVICE_ARN=$(aws apprunner list-services \
+            --region "$AWS_REGION" \
+            --query "ServiceSummaryList[?ServiceName=='$APP_RUNNER_SERVICE'].ServiceArn | [0]" \
+            --output text)
+
+          if [ "$SERVICE_ARN" = "None" ] || [ -z "$SERVICE_ARN" ]; then
+            echo "Creating App Runner service '$APP_RUNNER_SERVICE'..."
             cat > /tmp/instance-config.json <<JSON
           {
             "Cpu": "0.25 vCPU",
@@ -127,20 +136,24 @@ jobs:
 
             case "$STATUS" in
               RUNNING)
-                echo "Triggering explicit start-deployment..."
-                aws apprunner start-deployment \
+                # update-service reconciles RuntimeEnvironmentSecrets AND
+                # triggers a deployment. Replaces the previous start-deployment
+                # path so EXTERNAL_ID_SECRET propagates to the running service.
+                echo "Calling update-service (reconciles secrets + redeploys)..."
+                aws apprunner update-service \
                   --region "$AWS_REGION" \
-                  --service-arn "$SERVICE_ARN" >/dev/null
+                  --service-arn "$SERVICE_ARN" \
+                  --source-configuration file:///tmp/source-config.json >/dev/null
                 ;;
               OPERATION_IN_PROGRESS)
-                echo "Auto-deployment already in progress (AutoDeploymentsEnabled+ECR push race) — skipping explicit start-deployment."
+                echo "Auto-deployment already in progress (AutoDeploymentsEnabled+ECR push race) — skipping update-service this run; re-run workflow to reconcile env secrets."
                 ;;
               CREATE_FAILED|DELETE_FAILED|DELETED|PAUSED)
                 echo "ERROR: service in unexpected state '$STATUS' — aborting deploy."
                 exit 1
                 ;;
               *)
-                echo "Service status '$STATUS' — proceeding without explicit start-deployment."
+                echo "Service status '$STATUS' — proceeding without update-service."
                 ;;
             esac
 

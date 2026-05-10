@@ -440,10 +440,11 @@ def test_get_rule_stats_parses_uris_and_counts():
 
 
 def test_setup_info_returns_quick_create_url_with_external_id(client):
-    resp = client.get("/api/setup-info")
+    resp = client.get("/api/setup-info?account_id=123456789012")
     assert resp.status_code == 200
     body = resp.json()
     assert body["app_runner_account_id"] == "371126261144"
+    assert body["account_id"] == "123456789012"
     assert len(body["external_id"]) == 32
     assert body["cfn_template_url"].endswith("/customer-role.yaml")
     assert "templateURL=" in body["cfn_quick_create_url"]
@@ -453,20 +454,19 @@ def test_setup_info_returns_quick_create_url_with_external_id(client):
 
 
 def test_setup_info_quick_create_uses_question_mark_separator(client):
-    """Regression: the SPA route's query string must start with `?`, not `&`.
-    With `&` the AWS console lands on the stacks-list page instead of the
-    Quick-Create form.
-    """
-    body = client.get("/api/setup-info").json()
+    body = client.get("/api/setup-info?account_id=123456789012").json()
     url = body["cfn_quick_create_url"]
     assert "quickcreate?templateURL=" in url, url
     assert "quickcreate&templateURL=" not in url, url
 
 
-def test_setup_info_external_id_is_random(client):
-    a = client.get("/api/setup-info").json()["external_id"]
-    b = client.get("/api/setup-info").json()["external_id"]
-    assert a != b
+def test_setup_info_external_id_is_stable(client):
+    """Phase 3 hot-fix: deterministic per-account_id ExternalId."""
+    a = client.get("/api/setup-info?account_id=123456789012").json()["external_id"]
+    b = client.get("/api/setup-info?account_id=123456789012").json()["external_id"]
+    c = client.get("/api/setup-info?account_id=123456789012").json()["external_id"]
+    assert a == b == c
+    assert len(a) == 32
 
 
 # ---------- Scoring breakdown -------------------------------------------------
@@ -489,17 +489,28 @@ def test_estimated_waste_breakdown_per_rule():
 # ---------- Audit POST schema -------------------------------------------------
 
 
-def test_audit_create_request_accepts_external_id(client):
+def test_audit_create_request_no_external_id_field(client):
+    """external_id MUST NOT be in the request body — server recomputes it."""
     resp = client.post(
         "/api/audits",
         json={
             "account_id": "111122223333",
             "role_arn": None,
-            "external_id": "abc12345",
             "region": "us-east-1",
         },
     )
     assert resp.status_code == 202
+    # And providing an external_id is silently ignored (extra="ignore").
+    resp2 = client.post(
+        "/api/audits",
+        json={
+            "account_id": "111122223333",
+            "role_arn": None,
+            "external_id": "client-supplied-garbage",
+            "region": "us-east-1",
+        },
+    )
+    assert resp2.status_code == 202
 
 
 # ---------- _normalize_for_json (regression for "bytes is not JSON serializable") ----

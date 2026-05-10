@@ -15,7 +15,10 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  setupInfo: () => request("/api/setup-info"),
+  setupInfo: (accountId) => {
+    const q = accountId ? `?account_id=${encodeURIComponent(accountId)}` : "";
+    return request(`/api/setup-info${q}`);
+  },
   createAudit: (body) =>
     request("/api/audits", { method: "POST", body: JSON.stringify(body) }),
   listAudits: () => request("/api/audits"),

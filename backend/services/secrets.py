@@ -1,24 +1,32 @@
-"""Secrets loader for RuleIQ Phase 0.
+"""Secrets loader for RuleIQ.
 
 Resolution order (per secret):
     1. Environment variable
     2. AWS Secrets Manager (boto3 default credential chain)
+    3. (EXTERNAL_ID_SECRET only) process-level random fallback so the app
+       still boots — never crashes on missing config.
 
 Values are cached in module-level singletons after the first successful fetch.
 """
 from __future__ import annotations
 
 import json
+import logging
 import os
+import secrets as _stdsecrets
 from typing import Optional
 
 import boto3
 
+logger = logging.getLogger(__name__)
+
 _OPENAI_KEY_CACHE: Optional[str] = None
 _MONGO_URI_CACHE: Optional[str] = None
+_EXTERNAL_ID_SECRET_CACHE: Optional[str] = None
 
 OPENAI_SECRET_ID = "ruleiq/openai"
 MONGO_SECRET_ID = "ruleiq/mongodb"
+EXTERNAL_ID_SECRET_ID = "ruleiq/external-id-secret"
 AWS_REGION = "us-east-1"
 
 
@@ -56,9 +64,6 @@ def get_mongo_uri() -> str:
     """Return the MongoDB connection URI.
 
     Order: MONGODB_URI env var, then AWS Secrets Manager (JSON `{"uri": "..."}`).
-
-    Phase 0 stub — function is implemented but no Mongo client is instantiated
-    anywhere in the app. Reserved for Phase 1.
     """
     global _MONGO_URI_CACHE
     if _MONGO_URI_CACHE:
@@ -78,8 +83,51 @@ def get_mongo_uri() -> str:
     return _MONGO_URI_CACHE
 
 
+def get_external_id_secret() -> str:
+    """Return the HMAC secret used to derive per-tenant ExternalIds.
+
+    Order:
+        1. EXTERNAL_ID_SECRET env var
+        2. AWS Secrets Manager (`ruleiq/external-id-secret`, plain text hex)
+        3. Process-level random fallback (logged WARNING; the app keeps booting
+           but ExternalIds will rotate every restart — visible to the operator
+           in the logs).
+
+    Returns the raw secret string. The caller is responsible for encoding it
+    to bytes for HMAC.
+    """
+    global _EXTERNAL_ID_SECRET_CACHE
+    if _EXTERNAL_ID_SECRET_CACHE:
+        return _EXTERNAL_ID_SECRET_CACHE
+
+    env_val = os.environ.get("EXTERNAL_ID_SECRET")
+    if env_val:
+        _EXTERNAL_ID_SECRET_CACHE = env_val
+        return _EXTERNAL_ID_SECRET_CACHE
+
+    try:
+        raw = _fetch_secret_string(EXTERNAL_ID_SECRET_ID).strip()
+        if raw:
+            _EXTERNAL_ID_SECRET_CACHE = raw
+            return _EXTERNAL_ID_SECRET_CACHE
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "EXTERNAL_ID_SECRET unreachable via env or Secrets Manager (%s) — "
+            "falling back to a process-level random constant. ExternalIds "
+            "will rotate every restart. Bootstrap the secret to fix.",
+            exc,
+        )
+
+    # Process-level fallback: 64 hex chars (32 bytes). Derived ExternalIds
+    # remain stable for the lifetime of THIS process.
+    fallback = _stdsecrets.token_hex(32)
+    _EXTERNAL_ID_SECRET_CACHE = fallback
+    return _EXTERNAL_ID_SECRET_CACHE
+
+
 def _reset_cache_for_tests() -> None:
     """Test-only helper to clear cached singletons."""
-    global _OPENAI_KEY_CACHE, _MONGO_URI_CACHE
+    global _OPENAI_KEY_CACHE, _MONGO_URI_CACHE, _EXTERNAL_ID_SECRET_CACHE
     _OPENAI_KEY_CACHE = None
     _MONGO_URI_CACHE = None
+    _EXTERNAL_ID_SECRET_CACHE = None
