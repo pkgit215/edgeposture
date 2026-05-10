@@ -293,3 +293,20 @@ def test_pdf_endpoint_returns_409_for_pending_audit(client, db):
 def test_pdf_endpoint_returns_404_for_missing_audit(client):
     resp = client.get("/api/audits/does-not-exist/report.pdf")
     assert resp.status_code == 404
+
+
+def test_critical_routes_are_registered():
+    """Defensive: catches the 'router defined but not included' class of bug
+    that produced the Phase 4 production 404 false alarm."""
+    paths = {r.path for r in main.app.routes}
+    expected = {
+        "/api/health",
+        "/api/setup-info",
+        "/api/audits",
+        "/api/audits/{audit_id}",
+        "/api/audits/{audit_id}/rules",
+        "/api/audits/{audit_id}/findings",
+        "/api/audits/{audit_id}/report.pdf",
+    }
+    missing = expected - paths
+    assert not missing, f"Missing critical routes: {missing}"

@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api.js";
+import { formatLocalTimestamp } from "../lib/datetime.js";
 
 const TYPE_STYLES = {
   dead_rule: "bg-red-50 text-red-800 border-red-200",
@@ -201,6 +202,9 @@ function ResultsHeader({ auditId, run }) {
         </h1>
         <p className="mt-1 text-xs text-slate-500 font-mono">
           {auditId} · status: {status}
+          {run?.created_at && (
+            <> · started {formatLocalTimestamp(run.created_at)}</>
+          )}
         </p>
       </div>
       <button
@@ -446,7 +450,9 @@ function RuleBrowser({ rules, flaggedMap }) {
                     </td>
                     <td className="px-4 py-3 text-slate-600">
                       {r.last_fired ? (
-                        <span title={r.last_fired}>{relativeTime(r.last_fired)}</span>
+                        <span title={r.last_fired} className="font-mono text-xs">
+                          {formatLocalTimestamp(r.last_fired)}
+                        </span>
                       ) : (
                         <span>—</span>
                       )}

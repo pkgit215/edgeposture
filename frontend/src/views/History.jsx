@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
+import { formatLocalTimestamp } from "../lib/datetime.js";
 
 export default function History({ onOpenAudit }) {
   const [audits, setAudits] = useState(null);
@@ -60,7 +61,7 @@ export default function History({ onOpenAudit }) {
             {audits.map((a) => (
               <tr key={a.id} data-testid="history-row" className="hover:bg-slate-50">
                 <td className="px-4 py-3 text-slate-700">
-                  {a.created_at ? new Date(a.created_at).toLocaleString() : "—"}
+                  {a.created_at ? formatLocalTimestamp(a.created_at) : "—"}
                 </td>
                 <td className="px-4 py-3 font-mono text-xs">{a.account_id}</td>
                 <td className="px-4 py-3">
