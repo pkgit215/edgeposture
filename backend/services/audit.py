@@ -878,20 +878,16 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                 continue
             f["affected_rules"] = list(attached_acl_names)
 
-        # Phase 5.3.2 — severity rubric calibration. `dead_rule` is
-        # MEDIUM by default; HIGH is reserved for cases corroborated by
-        # active attack-shaped traffic. Since signature-level
-        # corroboration requires pattern matching we don't yet do, we
-        # use a coarse heuristic: keep HIGH only when at least one
-        # `bypass_candidate` finding exists in the same audit (i.e.
-        # there IS attack traffic reaching origin somewhere).
-        _has_bypass = any(
-            x.get("type") == "bypass_candidate" for x in final_findings
-        )
+        # Phase 5.3.2 / Fix #1 — severity rubric for `dead_rule`.
+        # Always MEDIUM. The earlier heuristic ("HIGH if ANY bypass exists
+        # in the same audit") was too coarse — it kept every dead rule
+        # HIGH whenever any bypass fired regardless of whether the dead
+        # rule's intent matched the bypass signature class. Smart
+        # signature-class correlation is tracked in GitHub issue #4 (P2)
+        # and is out of scope here.
         for f in final_findings:
             if f.get("type") == "dead_rule" and f.get("severity") == "high":
-                if not _has_bypass:
-                    f["severity"] = "medium"
+                f["severity"] = "medium"
 
         finding_docs: List[Dict[str, Any]] = []
         for f in final_findings:

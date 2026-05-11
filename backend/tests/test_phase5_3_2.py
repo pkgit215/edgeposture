@@ -101,10 +101,13 @@ def test_quick_win_shared_resource_keeps_redundancy_copy():
 # --- Fix 3 — dead_rule severity rubric ------------------------------------
 
 
-def test_dead_rule_high_is_downgraded_to_medium_without_corroborating_bypass(monkeypatch):
-    """Phase 5.3.2 — `dead_rule` HIGH severity reverts to MEDIUM when
-    no `bypass_candidate` finding exists in the same audit."""
-    db = mongomock.MongoClient()["ruleiq_phase5_3_2_sev"]
+def _run_dead_rule_severity_audit(monkeypatch, *, also_emit_bypass: bool):
+    """Helper — run a complete audit with one dead_rule (HIGH from the AI)
+    and optionally a co-existing bypass_candidate. Returns the persisted
+    dead_rule finding."""
+    db = mongomock.MongoClient()[
+        "ruleiq_fix1_bypass" if also_emit_bypass else "ruleiq_fix1_nobypass"
+    ]
     db_mod.set_test_db(db)
 
     rule = {
@@ -127,16 +130,27 @@ def test_dead_rule_high_is_downgraded_to_medium_without_corroborating_bypass(mon
         }
     monkeypatch.setattr(audit_mod, "_load_rules_from_fixtures", fake_load)
     monkeypatch.setenv("DEMO_MODE", "true")
+
+    findings = [{
+        "type": "dead_rule", "severity": "high",
+        "title": "LegacyDeadRule Not Firing",
+        "description": "x", "recommendation": "y",
+        "affected_rules": ["LegacyDeadRule"], "confidence": 0.7,
+    }]
+    if also_emit_bypass:
+        findings.append({
+            "type": "bypass_candidate", "severity": "high",
+            "title": "Possible WAF bypass: shellshock",
+            "description": "x", "recommendation": "y",
+            "affected_rules": ["acl-x"], "confidence": 0.9,
+            "evidence": "log-sample",
+        })
+
     monkeypatch.setattr(audit_mod.ai_pipeline, "run_pipeline",
         lambda rules, **_kw: {
             "rules": [{**r, "ai_explanation": {"explanation": "m",
                        "working": True, "concerns": None}} for r in rules],
-            "findings": [{
-                "type": "dead_rule", "severity": "high",
-                "title": "LegacyDeadRule Not Firing",
-                "description": "x", "recommendation": "y",
-                "affected_rules": ["LegacyDeadRule"], "confidence": 0.7,
-            }],
+            "findings": findings,
         })
 
     audit_id = audit_mod.create_audit_run(
@@ -144,11 +158,31 @@ def test_dead_rule_high_is_downgraded_to_medium_without_corroborating_bypass(mon
         region="us-east-1", log_window_days=30, external_id=None,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
-    findings = list(db["findings"].find({"audit_run_id": audit_id}))
-    dead = next(f for f in findings if f["type"] == "dead_rule")
-    assert dead["severity"] == "medium", (
-        "dead_rule with no corroborating bypass must be downgraded to MEDIUM"
+    return next(
+        f for f in db["findings"].find({"audit_run_id": audit_id})
+        if f["type"] == "dead_rule"
     )
+
+
+def test_dead_rule_severity_always_medium_without_bypass(monkeypatch):
+    """Fix #1 — dead_rule is MEDIUM when no bypass_candidate exists."""
+    dead = _run_dead_rule_severity_audit(monkeypatch, also_emit_bypass=False)
+    assert dead["severity"] == "medium"
+
+
+def test_dead_rule_severity_always_medium_with_bypass(monkeypatch):
+    """Fix #1 — dead_rule is MEDIUM even when a bypass_candidate co-exists.
+
+    The earlier heuristic (Phase 5.3.2) preserved HIGH on dead_rule
+    whenever ANY bypass fired in the same audit, regardless of whether
+    the dead rule's intent matched the bypass signature class. That
+    correlation was too coarse; we now always downgrade.
+
+    Smart signature-class correlation is tracked in GitHub issue #4 (P2)
+    and is intentionally NOT implemented here.
+    """
+    dead = _run_dead_rule_severity_audit(monkeypatch, also_emit_bypass=True)
+    assert dead["severity"] == "medium"
 
 
 # --- Fix 4 — conflict regression ------------------------------------------
