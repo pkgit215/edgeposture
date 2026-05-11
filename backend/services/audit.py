@@ -36,6 +36,7 @@ from . import ai_pipeline
 from . import aws_waf
 from . import remediation as remediation_mod
 from . import scoring
+from . import signature_class as signature_class_mod
 
 logger = logging.getLogger(__name__)
 
@@ -878,15 +879,41 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                 continue
             f["affected_rules"] = list(attached_acl_names)
 
-        # Phase 5.3.2 / Fix #1 — severity rubric for `dead_rule`.
-        # Always MEDIUM. The earlier heuristic ("HIGH if ANY bypass exists
-        # in the same audit") was too coarse — it kept every dead rule
-        # HIGH whenever any bypass fired regardless of whether the dead
-        # rule's intent matched the bypass signature class. Smart
-        # signature-class correlation is tracked in GitHub issue #4 (P2)
-        # and is out of scope here.
+        # Issue #4 — signature-class correlation for `dead_rule` severity.
+        # Build the set of attack classes observed in this audit's
+        # suspicious-request sample, then for each `dead_rule` HIGH from
+        # the AI:
+        #   * intent_class matches an observed class  → keep HIGH, tag
+        #     `evidence='signature_class_match'` + `signature_class=<c>`.
+        #   * otherwise                                → downgrade to MEDIUM
+        # Replaces the unconditional MEDIUM downgrade introduced in Fix #1.
+        signature_classes_observed: set = set()
+        for req in (meta.get("suspicious_requests") or []):
+            for c in (req.get("_signature_classes") or []):
+                if isinstance(c, str) and c:
+                    signature_classes_observed.add(c)
+
         for f in final_findings:
-            if f.get("type") == "dead_rule" and f.get("severity") == "high":
+            if f.get("type") != "dead_rule":
+                continue
+            if f.get("severity") != "high":
+                continue
+            # Look up the intent class for the affected rule(s). If any
+            # of them overlap with observed traffic, escalation holds.
+            matched_class = None
+            for rn in (f.get("affected_rules") or []):
+                rule_doc = rules_by_name.get(rn) or {}
+                ic = signature_class_mod.classify_rule_intent(
+                    rule_doc.get("statement_json"), rn,
+                )
+                if ic and ic in signature_classes_observed:
+                    matched_class = ic
+                    break
+            if matched_class:
+                f["evidence"] = "signature_class_match"
+                f["signature_class"] = matched_class
+                # Severity stays HIGH.
+            else:
                 f["severity"] = "medium"
 
         finding_docs: List[Dict[str, Any]] = []
@@ -916,6 +943,7 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                     "confidence": float(f.get("confidence", 0.0)),
                     "severity_score": score,
                     "evidence": f.get("evidence"),
+                    "signature_class": f.get("signature_class"),
                     "impact": impact,
                     "suggested_actions": list(remediation["suggested_actions"]),
                     "verify_by": remediation["verify_by"],

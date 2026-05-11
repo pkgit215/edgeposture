@@ -834,6 +834,25 @@ def sample_suspicious_allowed_requests(
                 continue
             tie += 1
             parsed["_suspicion_score"] = score
+            # Issue #4 — tag each persisted event with the set of
+            # signature classes it matched, so the audit pipeline can
+            # cross-reference dead-rule intent against observed traffic.
+            try:
+                from .signature_class import classify_request_pattern
+                http_obj = parsed.get("httpRequest") or {}
+                _ua = ""
+                for _h in (http_obj.get("headers") or []):
+                    if (_h.get("name") or "").lower() == "user-agent":
+                        _ua = _h.get("value") or ""
+                        break
+                parsed["_signature_classes"] = sorted(classify_request_pattern(
+                    uri=(http_obj.get("uri") or "")
+                        + ("?" + http_obj.get("args") if http_obj.get("args") else ""),
+                    headers=http_obj.get("headers") or [],
+                    ua=_ua,
+                ))
+            except Exception:  # noqa: BLE001
+                parsed["_signature_classes"] = []
             if len(heap) < top_k:
                 heapq.heappush(heap, (score, tie, parsed))
             elif score > heap[0][0]:
