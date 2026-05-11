@@ -295,21 +295,35 @@ def list_cloudfront_distributions_for_web_acl(
     Returns a list of `{"arn": ..., "id": ..., "domain_name": ...}` or
     None if AccessDenied / API unreachable (treated as Unknown by caller).
     """
+    # Phase 5.2.1 — CloudFront is global but the SDK still binds the
+    # endpoint via region_name. Pin to us-east-1 explicitly so an
+    # un-configured session region doesn't trip the client builder.
     try:
-        cf = session.client("cloudfront")
+        cf = session.client("cloudfront", region_name="us-east-1")
     except Exception as exc:  # noqa: BLE001
-        logger.warning("cloudfront client construction failed: %s", exc)
+        logger.warning(
+            "attachment_lookup acl_arn=%s scope=CLOUDFRONT method=cloudfront:ListDistributions "
+            "result=client_construction_failed error=%r",
+            web_acl_arn, exc,
+        )
         return None
     try:
         paginator = cf.get_paginator("list_distributions")
     except Exception as exc:  # noqa: BLE001
-        logger.warning("cloudfront paginator unavailable: %s", exc)
+        logger.warning(
+            "attachment_lookup acl_arn=%s scope=CLOUDFRONT method=cloudfront:ListDistributions "
+            "result=paginator_unavailable error=%r",
+            web_acl_arn, exc,
+        )
         return None
     matching: List[Dict[str, str]] = []
+    scanned = 0
     try:
         for page in paginator.paginate():
             dist_list = (page.get("DistributionList") or {})
-            for d in dist_list.get("Items", []) or []:
+            items = dist_list.get("Items", []) or []
+            scanned += len(items)
+            for d in items:
                 if d.get("WebACLId") == web_acl_arn:
                     matching.append({
                         "arn": d.get("ARN") or "",
@@ -319,15 +333,30 @@ def list_cloudfront_distributions_for_web_acl(
     except ClientError as exc:
         if _is_access_denied(exc):
             logger.warning(
-                "cloudfront:ListDistributions AccessDenied — add the perm to "
-                "the customer role to enable CloudFront attachment detection."
+                "attachment_lookup acl_arn=%s scope=CLOUDFRONT method=cloudfront:ListDistributions "
+                "result=access_denied — IAM role missing cloudfront:ListDistributions.",
+                web_acl_arn,
             )
             return None
-        logger.warning("cloudfront:ListDistributions failed: %s", exc)
+        logger.warning(
+            "attachment_lookup acl_arn=%s scope=CLOUDFRONT method=cloudfront:ListDistributions "
+            "result=client_error error=%r",
+            web_acl_arn, exc,
+        )
         return None
     except Exception as exc:  # noqa: BLE001
-        logger.warning("cloudfront:ListDistributions failed: %s", exc)
+        logger.warning(
+            "attachment_lookup acl_arn=%s scope=CLOUDFRONT method=cloudfront:ListDistributions "
+            "result=unexpected_error error=%r",
+            web_acl_arn, exc,
+        )
         return None
+    logger.info(
+        "attachment_lookup acl_arn=%s scope=CLOUDFRONT method=cloudfront:ListDistributions "
+        "result=success scanned=%d matches=%d match_ids=%s",
+        web_acl_arn, scanned, len(matching),
+        [m["id"] for m in matching],
+    )
     return matching
 
 
@@ -423,13 +452,27 @@ def list_resources_for_web_acl(
         # EVERY call failed → genuinely Unknown (no permission, or API down).
         if denied_rts:
             logger.warning(
-                "list_resources_for_web_acl REGIONAL all-denied for %s — "
-                "IAM role missing wafv2:ListResourcesForWebACL. Treating as UNKNOWN.",
-                web_acl.get("Name"),
+                "attachment_lookup acl_name=%s scope=REGIONAL "
+                "method=wafv2:ListResourcesForWebACL result=all_denied "
+                "denied_resource_types=%s — IAM role missing wafv2:ListResourcesForWebACL.",
+                web_acl.get("Name"), denied_rts,
+            )
+        else:
+            logger.warning(
+                "attachment_lookup acl_name=%s scope=REGIONAL "
+                "method=wafv2:ListResourcesForWebACL result=all_failed "
+                "other_failures=%s",
+                web_acl.get("Name"), other_failure_rts,
             )
         return None
     # At least one resource type returned successfully — the empty/non-empty
     # `arns` list is now a real signal: empty means truly orphan.
+    logger.info(
+        "attachment_lookup acl_name=%s scope=REGIONAL "
+        "method=wafv2:ListResourcesForWebACL result=success "
+        "resources=%d denied=%s other_failures=%s",
+        web_acl.get("Name"), len(arns), denied_rts, other_failure_rts,
+    )
     return arns
 
 

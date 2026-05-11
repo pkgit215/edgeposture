@@ -59,7 +59,16 @@ function _pad2(n) {
  */
 export function formatLocalTimestamp(value, fallback = "—") {
   if (value === null || value === undefined || value === "") return fallback;
-  const d = value instanceof Date ? value : new Date(value);
+  // Phase 5.2.1 — backend serialises Mongo BSON Date as ISO without a
+  // timezone suffix (e.g. "2026-05-11T20:00:00.123"). JS's Date()
+  // interprets that as LOCAL time, off by the local UTC offset. Force
+  // UTC interpretation when no offset is present.
+  let parsed = value;
+  if (typeof value === "string") {
+    const hasTz = /(Z|[+-]\d{2}:?\d{2})$/.test(value);
+    parsed = hasTz ? value : value + "Z";
+  }
+  const d = parsed instanceof Date ? parsed : new Date(parsed);
   if (isNaN(d.getTime())) return fallback;
 
   const yyyy = d.getFullYear();

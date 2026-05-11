@@ -107,6 +107,52 @@ def health() -> Dict[str, str]:
     }
 
 
+@app.get("/api/debug/last-audit")
+def debug_last_audit() -> Dict[str, Any]:
+    """Phase 5.2.1 debug endpoint — returns the most recent AWS-path audit
+    run document for diagnostics. NO AUTH. GET only. Read-only.
+
+    Removes ObjectIds + bytes; truncates suspicious_request_sample to 3
+    entries to keep response under a few KB. Intentionally exposes web_acls
+    in full so attachment status (attached / attached_resources) is
+    inspectable from outside the pod via curl.
+    """
+    try:
+        database = db_mod.get_db()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"mongo_unreachable: {exc}"}
+    doc = database["audit_runs"].find_one(
+        {"data_source": "aws"}, sort=[("created_at", -1)]
+    )
+    if not doc:
+        return {"error": "no_aws_audit_found"}
+
+    def _scrub(o: Any) -> Any:
+        if isinstance(o, bytes):
+            try:
+                return o.decode("utf-8", errors="replace")
+            except Exception:
+                return f"<{len(o)} bytes>"
+        if isinstance(o, dict):
+            return {k: _scrub(v) for k, v in o.items() if k != "_id" or True}
+        if isinstance(o, list):
+            return [_scrub(x) for x in o]
+        if hasattr(o, "isoformat"):
+            try:
+                return o.isoformat()
+            except Exception:
+                return str(o)
+        return o
+
+    out = _scrub(doc)
+    # Cap noisy fields so the response is curl-friendly.
+    if isinstance(out.get("suspicious_request_sample"), list):
+        out["suspicious_request_sample"] = out["suspicious_request_sample"][:3]
+    if isinstance(out.get("debug_log_sample"), list):
+        out["debug_log_sample"] = out["debug_log_sample"][:3]
+    return out
+
+
 # ---------- Phase 0 back-compat ----------------------------------------------
 
 
