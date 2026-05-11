@@ -1,0 +1,75 @@
+name: Bug report
+description: Something in RuleIQ is broken or behaving incorrectly.
+title: "[bug] "
+labels: ["type:bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing the bug.
+      placeholder: "When I run an audit on <X>, the finding for <Y> shows..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps a developer can follow to reproduce locally.
+      placeholder: |
+        1. POST /api/audits with body { ... }
+        2. Wait for status=complete
+        3. GET /api/audits/{id}/findings
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include log lines, JSON snippets, or screenshots if helpful.
+    validations:
+      required: true
+
+  - type: input
+    id: audit_id
+    attributes:
+      label: Audit ID (optional)
+      description: "Mongo `_id` of the run, if applicable. Helps the maintainer pull the persisted findings."
+      placeholder: "6a01ec88231a4c1f216db502"
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Affected component
+      options:
+        - backend
+        - frontend
+        - pdf
+        - methodology
+        - iam
+        - deployment
+        - docs
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - high
+        - medium
+        - low
+    validations:
+      required: true

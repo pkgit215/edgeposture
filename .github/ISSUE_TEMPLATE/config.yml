@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: README & general questions
+    url: https://github.com/pkgit215/ruleiq/blob/main/README.md
+    about: Setup, local dev, deploy. Read here first.
+  - name: Roadmap
+    url: https://github.com/pkgit215/ruleiq/blob/main/ROADMAP.md
+    about: Shipped / active / next / backlog at a glance.

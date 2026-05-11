@@ -1,0 +1,60 @@
+name: Security finding
+description: Report a security issue surfaced by an audit (or anywhere else in the product).
+title: "[security] "
+labels: ["type:security"]
+body:
+  - type: dropdown
+    id: finding_type
+    attributes:
+      label: Finding type
+      options:
+        - bypass_candidate
+        - dead_rule
+        - orphaned_web_acl
+        - stranded_rule
+        - rule_conflict
+        - count_mode_with_hits
+        - count_mode_high_volume
+        - count_mode_long_duration
+        - managed_rule_override_count
+        - fms_review
+        - quick_win
+        - other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - high
+        - medium
+        - low
+    validations:
+      required: true
+
+  - type: input
+    id: affected_resource
+    attributes:
+      label: Affected resource
+      description: "ARN, friendly name, or short identifier. Example: `aitrading.ninja` / `arn:aws:cloudfront::...`"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence_link
+    attributes:
+      label: Evidence
+      description: Link to audit run, log sample, screenshot, or paste a JSON snippet.
+    validations:
+      required: true
+
+  - type: input
+    id: mitigation_deadline
+    attributes:
+      label: Mitigation deadline
+      description: "ISO date (YYYY-MM-DD) by which mitigation must be in place."
+      placeholder: "2026-06-30"
+    validations:
+      required: true

@@ -1,0 +1,50 @@
+name: Feature request
+description: Propose a new RuleIQ capability or improvement.
+title: "[feat] "
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user need or gap motivates this feature? Be concrete.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Sketch the API / UI / data model change. Don't over-spec.
+    validations:
+      required: true
+
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: How will we know this is done? List 2–5 verifiable acceptance checks.
+    validations:
+      required: true
+
+  - type: input
+    id: phase
+    attributes:
+      label: Related phase
+      description: "Free-text. Example: 'follow-up to 5.3.2' or 'Phase 6 scope'."
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - backend
+        - frontend
+        - pdf
+        - methodology
+        - iam
+        - deployment
+        - docs
+        - other
+    validations:
+      required: true
