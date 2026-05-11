@@ -34,28 +34,51 @@ def test_demo_audit_endpoint_returns_combined_payload():
         assert key in body, f"missing top-level key: {key}"
     # Audit envelope carries the demo account stub, not a real one.
     assert body["audit"]["account_id"] == "123456789012"
-    assert isinstance(body["rules"], list) and len(body["rules"]) > 0
-    assert isinstance(body["findings"], list) and len(body["findings"]) > 0
+    # Enterprise-scale shape: 4 Web ACLs, 52 rules, $186/mo waste.
+    assert body["audit"]["web_acl_count"] == 4, body["audit"]["web_acl_count"]
+    assert body["audit"]["rule_count"] == 52, body["audit"]["rule_count"]
+    assert body["audit"]["estimated_waste_usd"] == 186.00, (
+        body["audit"]["estimated_waste_usd"]
+    )
+    assert len(body["rules"]) == 52, len(body["rules"])
+    assert len(body["audit"]["web_acls"]) == 4, len(body["audit"]["web_acls"])
+    # 14 findings; 4H / 5M / 5L distribution.
+    assert len(body["findings"]) == 14, len(body["findings"])
+    counts = {"high": 0, "medium": 0, "low": 0}
+    for f in body["findings"]:
+        counts[f["severity"]] += 1
+    assert counts == {"high": 4, "medium": 5, "low": 5}, counts
 
 
 def test_demo_audit_contains_multiple_finding_types():
-    """The demo must showcase at least 4 distinct finding types so the
-    `/demo` page demonstrates the product surface area, not a single
-    finding category."""
+    """The demo must showcase the full breadth of finding types
+    RuleIQ ships — at least 8 distinct types across security,
+    operational, and cost categories."""
     body = client.get("/api/demo/audit").json()
     types = {f["type"] for f in body["findings"]}
-    assert len(types) >= 4, f"demo too thin, only types: {sorted(types)}"
-    # The hero finding for a security demo: a bypass candidate.
-    assert "bypass_candidate" in types, (
-        f"demo missing bypass_candidate; types: {sorted(types)}"
+    assert len(types) >= 8, f"demo too thin, only types: {sorted(types)}"
+    # Spec-pinned types that the marketing/PR review must see.
+    expected = {
+        "bypass_candidate", "dead_rule", "conflict", "quick_win",
+        "fms_review", "count_mode_with_hits", "count_mode_high_volume",
+        "managed_rule_override_count", "orphaned_web_acl",
+    }
+    assert expected <= types, (
+        f"missing required types: {sorted(expected - types)}"
     )
 
 
 def test_demo_audit_has_no_real_account_id_leaked():
-    """Static-fixture guarantee: the real 371126261144 account id MUST
-    NOT leak into the committed demo payload."""
+    """Static-fixture guarantee: real-account / real-repo substrings must
+    NOT leak into the committed demo payload. `acmecorp.com` is the
+    fictional brand and is explicitly allowed."""
     resp = client.get("/api/demo/audit")
-    assert "371126261144" not in resp.text
+    for forbidden in ("371126261144", "aitrading.ninja", "pkgit215",
+                       "ruleiq-test-acl"):
+        assert forbidden not in resp.text, f"forbidden string leaked: {forbidden}"
+    # Sanity — the fictional brand is preserved (proves the test runs
+    # against the rich fixture, not a stripped one).
+    assert "acmecorp.com" in resp.text
 
 
 def test_demo_report_pdf_endpoint_returns_pdf_bytes():
