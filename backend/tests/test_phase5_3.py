@@ -219,6 +219,9 @@ def _minimal_audit_run(findings_extra=None, scopes=None):
 def test_pdf_renders_remediation_block_and_disclaimer():
     from pypdf import PdfReader
     run = _minimal_audit_run()
+    rem = remediation_mod.remediation_for(
+        {"type": "bypass_candidate", "affected_rules": []}
+    )
     findings = [{
         "type": "bypass_candidate",
         "severity": "high",
@@ -229,16 +232,16 @@ def test_pdf_renders_remediation_block_and_disclaimer():
         "confidence": 0.9,
         "severity_score": 80,
         "evidence": "log-sample",
-        "remediation": remediation_mod.remediation_for(
-            {"type": "bypass_candidate", "affected_rules": []}
-        ),
+        # Phase 5.3.1 — flat keys.
+        "suggested_actions": rem["suggested_actions"],
+        "verify_by": rem["verify_by"],
+        "disclaimer": rem["disclaimer"],
     }]
     pdf_bytes = pdf_report.render_audit_pdf(run, [], findings)
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf_bytes)).pages)
     assert "Remediation" in text
     assert "Suggested actions" in text
     assert "Verify by" in text
-    # Disclaimer fragment must appear exactly once per finding rendered.
     assert "RuleIQ does not generate WAF rules" in text
 
 
@@ -247,13 +250,16 @@ def test_pdf_cover_leads_with_security_posture_not_cost():
     from pypdf import PdfReader
     run = _minimal_audit_run()
     run["estimated_waste_usd"] = 72.0
+    rem = remediation_mod.remediation_for(
+        {"type": "bypass_candidate", "affected_rules": []}
+    )
     findings = [{
         "type": "bypass_candidate", "severity": "high",
         "title": "x", "description": "y", "recommendation": "z",
         "affected_rules": [], "confidence": 0.9, "severity_score": 80,
-        "remediation": remediation_mod.remediation_for(
-            {"type": "bypass_candidate", "affected_rules": []}
-        ),
+        "suggested_actions": rem["suggested_actions"],
+        "verify_by": rem["verify_by"],
+        "disclaimer": rem["disclaimer"],
     }]
     pdf_bytes = pdf_report.render_audit_pdf(run, [], findings)
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf_bytes)).pages)
@@ -341,8 +347,8 @@ def test_count_mode_findings_persist_through_run_audit_pipeline(monkeypatch):
     types = [f["type"] for f in findings]
     assert "count_mode_with_hits" in types
     assert "count_mode_high_volume" in types
-    # Remediation attached on every persisted finding
+    # Remediation FLAT keys attached on every persisted finding
     for f in findings:
-        rem = f.get("remediation")
-        assert rem
-        assert rem["disclaimer"] == remediation_mod.UNIVERSAL_DISCLAIMER
+        assert isinstance(f.get("suggested_actions"), list) and f["suggested_actions"]
+        assert isinstance(f.get("verify_by"), str) and f["verify_by"]
+        assert f.get("disclaimer") == remediation_mod.UNIVERSAL_DISCLAIMER

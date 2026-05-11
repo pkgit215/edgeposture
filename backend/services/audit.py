@@ -818,6 +818,23 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
             guarded + orphan_findings + count_findings + override_findings
         )
 
+        # Phase 5.3.1 — populate `affected_rules` on bypass_candidate
+        # findings. The bypass scorer (Pass 3) emits log-derived findings
+        # with empty affected_rules because it operates on suspicious
+        # request samples, not the rule statements. The audit pipeline
+        # is the right place to bind these to the Web ACL(s) where the
+        # attack-shaped request actually reached origin.
+        attached_acl_names = [
+            s.get("name") for s in web_acl_summaries
+            if s.get("name") and s.get("attached") is not False
+        ]
+        for f in final_findings:
+            if f.get("type") != "bypass_candidate":
+                continue
+            if f.get("affected_rules"):
+                continue
+            f["affected_rules"] = list(attached_acl_names)
+
         finding_docs: List[Dict[str, Any]] = []
         for f in final_findings:
             score = scoring.severity_score(
@@ -826,9 +843,10 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                 affected_rules=f.get("affected_rules", []),
                 total_rule_count=total,
             )
-            # Phase 5.3.1 — canned remediation lookup. Attached on the
-            # finding doc so both the PDF renderer and the API serializer
-            # carry the same content.
+            # Phase 5.3.1 — canned remediation lookup. Merge FLAT keys
+            # (`suggested_actions`, `verify_by`, `disclaimer`) onto the
+            # finding doc so the API serializer and PDF renderer read
+            # the same top-level fields.
             remediation = remediation_mod.remediation_for(f, rules_by_name)
             finding_docs.append(
                 {
@@ -842,7 +860,9 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                     "confidence": float(f.get("confidence", 0.0)),
                     "severity_score": score,
                     "evidence": f.get("evidence"),
-                    "remediation": remediation,
+                    "suggested_actions": list(remediation["suggested_actions"]),
+                    "verify_by": remediation["verify_by"],
+                    "disclaimer": remediation["disclaimer"],
                     "created_at": _utcnow(),
                 }
             )

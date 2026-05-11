@@ -512,12 +512,44 @@ def _render_finding(f: Dict[str, Any], fms_set: set,
         ("BOX", (0, 0), (-1, -1), 0.4, HAIRLINE),
     ]))
 
-    # Phase 5.3.1 — Remediation block.
-    remediation = f.get("remediation") or {}
-    if remediation:
-        rem_block = _render_remediation_block(remediation, sev, S)
-        return KeepTogether([row, Spacer(1, 2), rem_block])
-    return KeepTogether(row)
+    # Phase 5.3.1 — Remediation block. Read FLAT keys directly off the
+    # finding (Phase ≥5.3.1 shape). For audits persisted by older code
+    # paths (nested `remediation` dict OR no remediation at all), fall
+    # back gracefully so existing audits still render.
+    suggested = f.get("suggested_actions")
+    verify_by = f.get("verify_by")
+    disclaimer = f.get("disclaimer")
+    if suggested is None or verify_by is None or disclaimer is None:
+        nested = f.get("remediation") or {}
+        suggested = suggested or nested.get("suggested_actions")
+        verify_by = verify_by or nested.get("verify_by")
+        disclaimer = disclaimer or nested.get("disclaimer")
+    if not suggested and not verify_by and not disclaimer:
+        # Legacy audit (pre-5.3) — fall back to the AI recommendation so
+        # the report still renders, but log so an operator can re-run.
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "PDF render: finding %r has no remediation fields — falling back "
+            "to ai.recommendation. Re-run the audit on Phase ≥5.3.1 to "
+            "populate suggested_actions/verify_by/disclaimer.",
+            f.get("title"),
+        )
+        if rec:
+            rem_block = _render_remediation_block(
+                {"suggested_actions": [rec], "verify_by": "",
+                 "disclaimer": ""},
+                sev, S,
+            )
+            return KeepTogether([row, Spacer(1, 2), rem_block])
+        return KeepTogether(row)
+
+    rem_block = _render_remediation_block(
+        {"suggested_actions": list(suggested or []),
+         "verify_by": verify_by or "",
+         "disclaimer": disclaimer or ""},
+        sev, S,
+    )
+    return KeepTogether([row, Spacer(1, 2), rem_block])
 
 
 def _render_remediation_block(

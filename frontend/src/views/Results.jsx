@@ -382,7 +382,17 @@ function FindingCard({ f }) {
   const typePill = TYPE_STYLES[f.type] || "bg-slate-100 text-slate-700 border-slate-200";
   const isFms = f.type === "fms_review";
   const [showRem, setShowRem] = useState(f.severity === "high");
-  const remediation = f.remediation;
+  // Phase 5.3.1 — flat keys (`suggested_actions`, `verify_by`, `disclaimer`)
+  // are now persisted directly on the finding. Fall back to the old
+  // `f.remediation.*` shape for audits run on Phase 5.3 (pre-fix).
+  const suggestedActions =
+    f.suggested_actions || (f.remediation && f.remediation.suggested_actions) || [];
+  const verifyBy =
+    f.verify_by || (f.remediation && f.remediation.verify_by) || "";
+  const disclaimer =
+    f.disclaimer || (f.remediation && f.remediation.disclaimer) || "";
+  const hasRemediation =
+    (suggestedActions && suggestedActions.length > 0) || verifyBy || disclaimer;
   return (
     <article
       data-testid="finding-card"
@@ -430,7 +440,7 @@ function FindingCard({ f }) {
           Controlled by your central security admin via Firewall Manager — cannot be modified here.
         </p>
       )}
-      {remediation && (
+      {hasRemediation && (
         <div
           data-testid="remediation-block"
           className={`mt-4 rounded-lg border-l-4 bg-slate-50 ${
@@ -452,29 +462,39 @@ function FindingCard({ f }) {
             <span className="text-xs text-slate-500">{showRem ? "Hide" : "Show"}</span>
           </button>
           {showRem && (
-            <div className="space-y-3 px-4 pb-4 text-sm text-slate-700">
+            <div
+              data-testid="remediation-body"
+              className="space-y-3 px-4 pb-4 text-sm text-slate-700"
+            >
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Suggested actions
                 </div>
-                <ul className="mt-1 list-disc space-y-1 pl-5">
-                  {(remediation.suggested_actions || []).map((a, i) => (
+                <ul
+                  data-testid="suggested-actions"
+                  className="mt-1 list-disc space-y-1 pl-5"
+                >
+                  {suggestedActions.map((a, i) => (
                     <li key={i}>{a}</li>
                   ))}
                 </ul>
               </div>
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Verify by
+              {verifyBy && (
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Verify by
+                  </div>
+                  <p className="mt-1">{verifyBy}</p>
                 </div>
-                <p className="mt-1">{remediation.verify_by}</p>
-              </div>
-              <p
-                data-testid="remediation-disclaimer"
-                className="text-[11px] italic leading-snug text-slate-500"
-              >
-                {remediation.disclaimer}
-              </p>
+              )}
+              {disclaimer && (
+                <p
+                  data-testid="remediation-disclaimer"
+                  className="text-[11px] italic leading-snug text-slate-500"
+                >
+                  {disclaimer}
+                </p>
+              )}
             </div>
           )}
         </div>

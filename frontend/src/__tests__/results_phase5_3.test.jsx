@@ -38,18 +38,17 @@ const FINDINGS = [
     title: "Possible WAF bypass",
     description: "shellshock reached origin",
     recommendation: "Enable KnownBadInputs",
-    affected_rules: [],
+    affected_rules: ["ruleiq-cf-acl"],
     confidence: 0.9,
     severity_score: 80,
-    remediation: {
-      suggested_actions: [
-        "Enable a managed rule group that covers shellshock signatures.",
-        "Deploy in COUNT mode first.",
-      ],
-      verify_by: "Replay the captured request and confirm 403.",
-      disclaimer:
-        "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups.",
-    },
+    // Phase 5.3.1 — flat keys
+    suggested_actions: [
+      "Enable a managed rule group that covers shellshock signatures.",
+      "Deploy in COUNT mode first.",
+    ],
+    verify_by: "Replay the captured request and confirm 403.",
+    disclaimer:
+      "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups.",
   },
   {
     id: "f-count",
@@ -61,11 +60,9 @@ const FINDINGS = [
     affected_rules: ["R1"],
     confidence: 0.85,
     severity_score: 50,
-    remediation: {
-      suggested_actions: ["Promote to BLOCK after sampling."],
-      verify_by: "Monitor for 7 days post-promotion.",
-      disclaimer: "RuleIQ does not generate WAF rules.",
-    },
+    suggested_actions: ["Promote to BLOCK after sampling."],
+    verify_by: "Monitor for 7 days post-promotion.",
+    disclaimer: "RuleIQ does not generate WAF rules.",
   },
 ];
 
@@ -142,5 +139,23 @@ describe("Phase 5.3 — Results UI", () => {
     render(<Results auditId={RUN.id} onGoConnect={() => {}} />);
     const lead = await screen.findByTestId("security-lead");
     expect(lead.textContent).toMatch(/potential security gap/);
+  });
+
+  it("Phase 5.3.1 Fix 6 — clicking the accordion header reveals the suggested-actions list", async () => {
+    mockApi();
+    render(<Results auditId={RUN.id} onGoConnect={() => {}} />);
+    const toggles = await screen.findAllByTestId("remediation-toggle");
+    // pick the MEDIUM finding (second one) — starts collapsed.
+    const mediumToggle = toggles[1];
+    // Initially collapsed: no suggested-actions <ul> for this card.
+    const initialLists = screen.queryAllByTestId("suggested-actions");
+    // Expand it.
+    fireEvent.click(mediumToggle);
+    await waitFor(() => {
+      const lists = screen.getAllByTestId("suggested-actions");
+      expect(lists.length).toBeGreaterThan(initialLists.length);
+    });
+    // The MED finding's `Promote to BLOCK after sampling.` text must now be visible.
+    expect(await screen.findByText(/Promote to BLOCK after sampling/)).toBeTruthy();
   });
 });

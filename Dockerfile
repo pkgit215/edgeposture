@@ -37,6 +37,11 @@ COPY backend/ /app/
 # Pull the built SPA from the builder stage; FastAPI mounts /app/static at /.
 COPY --from=web /web/dist/ /app/static/
 
+# Phase 5.3.1 — verify the SPA assets are fresh in the image. If you see an
+# empty list here in the App Runner build log, the multi-stage build did not
+# wire correctly and the deployed UI will be the legacy bundle.
+RUN ls -la /app/static/ && ls -la /app/static/assets/ | head -5
+
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
