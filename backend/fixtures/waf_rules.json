@@ -6,7 +6,7 @@
     "action": "BLOCK",
     "statement_json": {
       "IPSetReferenceStatement": {
-        "ARN": "arn:aws:wafv2:us-east-1:371126261144:regional/ipset/known-malicious-ips/abc123"
+        "ARN": "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/known-malicious-ips/abc123"
       }
     },
     "hit_count": 18432,
@@ -145,7 +145,7 @@
     "action": "ALLOW",
     "statement_json": {
       "IPSetReferenceStatement": {
-        "ARN": "arn:aws:wafv2:us-east-1:371126261144:regional/ipset/office-ips/def456"
+        "ARN": "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/office-ips/def456"
       }
     },
     "hit_count": 8420,
@@ -168,7 +168,7 @@
         "Statements": [
           {
             "IPSetReferenceStatement": {
-              "ARN": "arn:aws:wafv2:us-east-1:371126261144:regional/ipset/office-ips/def456"
+              "ARN": "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/office-ips/def456"
             }
           },
           {
@@ -199,7 +199,7 @@
     "action": "BLOCK",
     "statement_json": {
       "IPSetReferenceStatement": {
-        "ARN": "arn:aws:wafv2:us-east-1:371126261144:regional/ipset/known-malicious-ips/abc123"
+        "ARN": "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/known-malicious-ips/abc123"
       }
     },
     "hit_count": 12,

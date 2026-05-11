@@ -154,7 +154,7 @@ def _run_dead_rule_severity_audit(monkeypatch, *, also_emit_bypass: bool):
         })
 
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144", role_arn=None,
+        db=db, account_id="123456789012", role_arn=None,
         region="us-east-1", log_window_days=30, external_id=None,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -269,7 +269,7 @@ def test_impact_field_present_on_every_persisted_finding(monkeypatch):
         })
 
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144", role_arn=None,
+        db=db, account_id="123456789012", role_arn=None,
         region="us-east-1", log_window_days=30, external_id=None,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -308,7 +308,7 @@ def test_pdf_contains_impact_per_finding_and_methodology_appendix():
     import datetime as _dt
 
     run = {
-        "_id": "x", "account_id": "371126261144", "data_source": "aws",
+        "_id": "x", "account_id": "123456789012", "data_source": "aws",
         "rule_count": 0, "web_acl_count": 0,
         "estimated_waste_usd": 0.0, "estimated_waste_breakdown": [],
         "created_at": _dt.datetime.now(_dt.timezone.utc),

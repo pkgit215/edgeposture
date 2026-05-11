@@ -149,7 +149,7 @@ def _run(monkeypatch, *, rule, suspicious, label):
             }],
         })
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144", role_arn=None,
+        db=db, account_id="123456789012", role_arn=None,
         region="us-east-1", log_window_days=30, external_id=None,
     )
     audit_mod.run_audit_pipeline(audit_id, db)

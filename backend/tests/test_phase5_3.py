@@ -206,7 +206,7 @@ def test_managed_override_findings_emit_one_per_count_override():
 def _minimal_audit_run(findings_extra=None, scopes=None):
     import datetime as _dt
     return {
-        "_id": "x", "account_id": "371126261144",
+        "_id": "x", "account_id": "123456789012",
         "data_source": "aws", "rule_count": 0, "web_acl_count": 0,
         "estimated_waste_usd": 0.0, "estimated_waste_breakdown": [],
         "created_at": _dt.datetime.now(_dt.timezone.utc),
@@ -339,7 +339,7 @@ def test_count_mode_findings_persist_through_run_audit_pipeline(monkeypatch):
     monkeypatch.setattr(audit_mod.ai_pipeline, "run_pipeline", fake_pipeline)
 
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144", role_arn=None,
+        db=db, account_id="123456789012", role_arn=None,
         region="us-east-1", log_window_days=30, external_id=None,
     )
     audit_mod.run_audit_pipeline(audit_id, db)

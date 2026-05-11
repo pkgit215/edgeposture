@@ -35,7 +35,7 @@ disclaimer.
 RuleIQ is read-only — it cannot create, modify, or delete any rule in
 your account. All AWS calls use STS AssumeRole with session tokens only.
 No keys are stored. Source code is available at
-[github.com/pkgit215/ruleiq](https://github.com/pkgit215/ruleiq); the
+[github.com/<YOUR_GITHUB_ORG>/ruleiq](https://github.com/<YOUR_GITHUB_ORG>/ruleiq); the
 IAM role definition (`cloudformation/customer-role.yaml`) is
 public so you can audit every permission RuleIQ requests before granting
 it.

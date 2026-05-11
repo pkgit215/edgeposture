@@ -15,7 +15,7 @@
 set -euo pipefail
 
 REGION="${AWS_REGION:-us-east-1}"
-ACCOUNT_ID="${AWS_ACCOUNT_ID:-371126261144}"
+ACCOUNT_ID="${AWS_ACCOUNT_ID:-123456789012}"
 SECRET_NAME="ruleiq/external-id-secret"
 INSTANCE_ROLE="ruleiq-apprunner-instance"
 INLINE_POLICY_NAME="AllowReadExternalIdSecret"

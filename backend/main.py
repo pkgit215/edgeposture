@@ -38,7 +38,7 @@ logger = logging.getLogger("ruleiq")
 DEMO_MODE = os.environ.get("DEMO_MODE", "true").lower() in ("1", "true", "yes")
 TESTING = os.environ.get("RULEIQ_TESTING", "0") == "1"
 APP_RUNNER_ACCOUNT_ID = os.environ.get(
-    "RULEIQ_APP_RUNNER_ACCOUNT_ID", "371126261144"
+    "RULEIQ_APP_RUNNER_ACCOUNT_ID", "123456789012"
 )
 PUBLIC_TEMPLATES_BUCKET = os.environ.get(
     "RULEIQ_PUBLIC_TEMPLATES_BUCKET",

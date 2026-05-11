@@ -443,12 +443,12 @@ def test_setup_info_returns_quick_create_url_with_external_id(client):
     resp = client.get("/api/setup-info?account_id=123456789012")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["app_runner_account_id"] == "371126261144"
+    assert body["app_runner_account_id"] == "123456789012"
     assert body["account_id"] == "123456789012"
     assert len(body["external_id"]) == 32
     assert body["cfn_template_url"].endswith("/customer-role.yaml")
     assert "templateURL=" in body["cfn_quick_create_url"]
-    assert "param_RuleIQTrustedAccount=371126261144" in body["cfn_quick_create_url"]
+    assert "param_RuleIQTrustedAccount=123456789012" in body["cfn_quick_create_url"]
     assert f"param_ExternalId={body['external_id']}" in body["cfn_quick_create_url"]
     assert body["inline_iam_json"]["Version"] == "2012-10-17"
 

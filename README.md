@@ -120,8 +120,8 @@ propagation window.
 
 Phase 5.2.2 enriches Web ACL attachments with human-readable names (CloudFront
 DomainName / custom alias, ALB DNSName, API Gateway name) so the PDF and the
-UI show `aitrading.ninja` instead of
-`arn:aws:cloudfront::371126261144:distribution/EKOXAVPA9GX2R`. The lookups are
+UI show `www.example.com` instead of
+`arn:aws:cloudfront::<YOUR_AWS_ACCOUNT_ID>:distribution/EXXXXXXXXXXXXX`. The lookups are
 optional — any AccessDenied is caught and the friendly field falls back to
 `None`, so the audit never fails on missing perms.
 

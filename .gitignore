@@ -12,6 +12,10 @@ venv/
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+secrets.json
+credentials.json
 
 # build / dist artifacts
 dist/
