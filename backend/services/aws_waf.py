@@ -230,6 +230,128 @@ def classify_rule_kind(statement: Dict[str, Any]) -> str:
     return "custom"
 
 
+def _classify_resource_arn(arn: str) -> str:
+    """Map an AWS ARN string to a short resource-type label."""
+    if not arn:
+        return "UNKNOWN"
+    if ":cloudfront:" in arn or ":cloudfront::" in arn:
+        return "CLOUDFRONT"
+    if ":elasticloadbalancing:" in arn and ":loadbalancer/app/" in arn:
+        return "ALB"
+    if ":apigateway:" in arn or ":execute-api:" in arn:
+        return "API_GW"
+    if ":appsync:" in arn:
+        return "APPSYNC"
+    if ":cognito-idp:" in arn:
+        return "COGNITO"
+    if ":apprunner:" in arn:
+        return "APPRUNNER"
+    return "UNKNOWN"
+
+
+def _resource_id_from_arn(arn: str) -> str:
+    """Best-effort id extraction — last `/` or `:` segment of the ARN."""
+    if not arn:
+        return ""
+    last_slash = arn.rsplit("/", 1)
+    if len(last_slash) == 2 and last_slash[1]:
+        return last_slash[1]
+    return arn.rsplit(":", 1)[-1]
+
+
+def enrich_resource_friendly_names(
+    session: boto3.Session,
+    resource_arns: List[str],
+    *,
+    cf_distros: Optional[List[Dict[str, str]]] = None,
+) -> List[Dict[str, Optional[str]]]:
+    """Phase 5.2.2 — turn a list of ARN strings into a list of
+    `{arn, type, id, friendly}` dicts. Best-effort: failures don't break
+    the audit; `friendly` is left as None for that resource.
+
+    `cf_distros` lets the caller pass distributions already enumerated by
+    `list_cloudfront_distributions_for_web_acl` (which carries DomainName);
+    we look up Aliases via a per-distribution `cloudfront:get-distribution`
+    call only when an alias would meaningfully beat the cloudfront.net
+    name. Other resource types are looked up via their type-specific API.
+    """
+    out: List[Dict[str, Optional[str]]] = []
+    cf_by_arn = {d.get("arn"): d for d in (cf_distros or []) if d.get("arn")}
+
+    # Cache per-type clients lazily.
+    elbv2_client = None
+    cf_client = None
+    apigw_client = None
+    apigwv2_client = None
+
+    for arn in resource_arns:
+        rtype = _classify_resource_arn(arn)
+        rid = _resource_id_from_arn(arn)
+        friendly: Optional[str] = None
+        try:
+            if rtype == "CLOUDFRONT":
+                hint = cf_by_arn.get(arn) or {}
+                friendly = hint.get("domain_name") or None
+                # Upgrade to a custom alias when available.
+                try:
+                    if cf_client is None:
+                        cf_client = session.client("cloudfront", region_name="us-east-1")
+                    if rid:
+                        resp = cf_client.get_distribution(Id=rid)
+                        aliases = ((resp.get("Distribution") or {}).get("DistributionConfig") or {}).get("Aliases") or {}
+                        items = aliases.get("Items") or []
+                        if items:
+                            friendly = items[0]
+                except ClientError as exc:
+                    if not _is_access_denied(exc):
+                        logger.debug("get_distribution failed for %s: %s", rid, exc)
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("get_distribution failed for %s: %s", rid, exc)
+            elif rtype == "ALB":
+                try:
+                    region = arn.split(":")[3] or DEFAULT_REGION
+                    if elbv2_client is None:
+                        elbv2_client = session.client("elbv2", region_name=region)
+                    resp = elbv2_client.describe_load_balancers(LoadBalancerArns=[arn])
+                    lbs = resp.get("LoadBalancers") or []
+                    if lbs:
+                        friendly = lbs[0].get("DNSName") or lbs[0].get("LoadBalancerName")
+                except ClientError as exc:
+                    if not _is_access_denied(exc):
+                        logger.debug("describe_load_balancers failed: %s", exc)
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("describe_load_balancers failed: %s", exc)
+            elif rtype == "API_GW":
+                # APIGatewayv2 or REST API — try both lazily.
+                try:
+                    region = arn.split(":")[3] or DEFAULT_REGION
+                    if apigwv2_client is None:
+                        apigwv2_client = session.client("apigatewayv2", region_name=region)
+                    resp = apigwv2_client.get_api(ApiId=rid)
+                    friendly = resp.get("Name") or rid
+                except Exception:  # noqa: BLE001
+                    try:
+                        if apigw_client is None:
+                            apigw_client = session.client("apigateway", region_name=region)
+                        resp = apigw_client.get_rest_api(restApiId=rid)
+                        friendly = resp.get("name") or rid
+                    except Exception as exc:  # noqa: BLE001
+                        logger.debug("apigw friendly name lookup failed: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "attachment_lookup arn=%s type=%s method=friendly_name "
+                "result=unexpected_error error=%r",
+                arn, rtype, exc,
+            )
+        logger.info(
+            "attachment_lookup arn=%s type=%s method=friendly_name "
+            "result=%s id=%s friendly=%r",
+            arn, rtype, "success" if friendly else "no_friendly", rid, friendly,
+        )
+        out.append({"arn": arn, "type": rtype, "id": rid, "friendly": friendly})
+    return out
+
+
 def derive_mode(rule: Dict[str, Any], kind: str) -> str:
     """Phase 5: human-readable rule action, fixing the OverrideAction misread.
 

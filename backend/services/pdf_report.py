@@ -516,6 +516,17 @@ def _build_web_acl_section(audit_run: Dict[str, Any],
         textColor=colors.white, fontSize=9,
     )
 
+    def _resource_label(r: Any) -> str:
+        """Phase 5.2.2 — prefer friendly name, then id, then short ARN tail."""
+        if isinstance(r, dict):
+            v = r.get("friendly") or r.get("id")
+            if v:
+                return str(v)
+            arn = r.get("arn") or ""
+            return arn.rsplit("/", 1)[-1] or arn
+        s = str(r)
+        return s.rsplit("/", 1)[-1] or s
+
     rows: List[List[Any]] = [[
         Paragraph("Web ACL", header_style),
         Paragraph("Scope", header_style),
@@ -528,7 +539,15 @@ def _build_web_acl_section(audit_run: Dict[str, Any],
         resources = acl.get("attached_resources") or []
         if attached is True:
             status_para = Paragraph("Attached", cell_bold)
-            resource_text = _fmt_int(len(resources)) + " resource(s)"
+            labels = [_resource_label(r) for r in resources]
+            shown = labels[:2]
+            extra = len(labels) - len(shown)
+            if shown:
+                resource_text = ", ".join(shown)
+                if extra > 0:
+                    resource_text += f" (+{extra} more)"
+            else:
+                resource_text = _fmt_int(len(resources)) + " resource(s)"
         elif attached is False:
             orphan_idx.append(i)
             status_para = Paragraph("ORPHANED", cell_orphan)

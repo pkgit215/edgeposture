@@ -537,7 +537,7 @@ function WasteBreakdown({ breakdown, total }) {
 
 function WebACLPanel({ webAcls }) {
   if (!webAcls || webAcls.length === 0) return null;
-  const orphanCount = webAcls.filter((a) => !a.attached).length;
+  const orphanCount = webAcls.filter((a) => a.attached === false).length;
   return (
     <section data-testid="web-acl-panel">
       <div className="mb-3 flex items-center justify-between">
@@ -563,14 +563,15 @@ function WebACLPanel({ webAcls }) {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {webAcls.map((a, i) => {
-              const attached = !!a.attached;
-              const count = (a.attached_resources || []).length;
+              const attached = a.attached === true;
+              const unknown = a.attached === null || a.attached === undefined;
+              const resources = a.attached_resources || [];
               return (
                 <tr
                   key={`${a.name}-${i}`}
                   data-testid="web-acl-row"
-                  data-attached={attached ? "1" : "0"}
-                  className={attached ? "" : "bg-amber-50/40"}
+                  data-attached={attached ? "1" : unknown ? "?" : "0"}
+                  className={attached ? "" : unknown ? "" : "bg-amber-50/40"}
                 >
                   <td className="px-4 py-3 font-mono text-xs text-slate-800">
                     {a.name}
@@ -578,7 +579,9 @@ function WebACLPanel({ webAcls }) {
                   <td className="px-4 py-3 text-slate-600">{a.scope || "REGIONAL"}</td>
                   <td className="px-4 py-3 text-slate-700">
                     {attached ? (
-                      <span>{count} resource{count === 1 ? "" : "s"}</span>
+                      <ResourceList resources={resources} />
+                    ) : unknown ? (
+                      <span className="italic text-slate-500">could not verify</span>
                     ) : (
                       <span className="italic text-slate-500">none</span>
                     )}
@@ -587,6 +590,10 @@ function WebACLPanel({ webAcls }) {
                     {attached ? (
                       <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                         Attached
+                      </span>
+                    ) : unknown ? (
+                      <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                        Unknown
                       </span>
                     ) : (
                       <span
@@ -604,6 +611,72 @@ function WebACLPanel({ webAcls }) {
         </table>
       </div>
     </section>
+  );
+}
+
+function _consoleUrlForResource(r) {
+  // r is either a string ARN (legacy) or a dict {arn,type,id,friendly}.
+  if (!r || typeof r === "string") return null;
+  const { type, id, arn } = r;
+  if (!type) return null;
+  if (type === "CLOUDFRONT" && id) {
+    return `https://us-east-1.console.aws.amazon.com/cloudfront/v4/home#/distributions/${id}`;
+  }
+  if (type === "ALB" && arn) {
+    return `https://console.aws.amazon.com/ec2/home#LoadBalancers:search=${encodeURIComponent(
+      arn,
+    )}`;
+  }
+  if (type === "API_GW" && id) {
+    return `https://console.aws.amazon.com/apigateway/main/apis/${id}/overview`;
+  }
+  return null;
+}
+
+function ResourceList({ resources }) {
+  if (!resources || resources.length === 0) {
+    return <span className="italic text-slate-500">no resources</span>;
+  }
+  const visible = resources.slice(0, 3);
+  const extra = resources.length - visible.length;
+  return (
+    <div className="flex flex-col gap-1">
+      {visible.map((r, idx) => {
+        const isDict = r && typeof r === "object";
+        const label =
+          (isDict && (r.friendly || r.id)) || (isDict ? r.arn : r) || "—";
+        const sub = isDict
+          ? r.type + (r.id && r.id !== label ? ` · ${r.id}` : "")
+          : null;
+        const url = _consoleUrlForResource(r);
+        return (
+          <div key={idx} data-testid="attached-resource" className="leading-tight">
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono text-xs text-blue-700 hover:underline"
+              >
+                {label}
+              </a>
+            ) : (
+              <span className="font-mono text-xs text-slate-800">{label}</span>
+            )}
+            {sub && (
+              <span className="ml-1 text-[10px] uppercase tracking-wide text-slate-500">
+                {sub}
+              </span>
+            )}
+          </div>
+        );
+      })}
+      {extra > 0 && (
+        <span className="text-[11px] text-slate-500 italic">
+          +{extra} more
+        </span>
+      )}
+    </div>
   );
 }
 

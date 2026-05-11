@@ -63,6 +63,14 @@ Resources:
                 Effect: Allow
                 Action:
                   - cloudfront:ListDistributions
+                  - cloudfront:GetDistribution
+                Resource: "*"
+              - Sid: ResourceFriendlyNameRead
+                Effect: Allow
+                Action:
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - apigateway:GET
+                  - cognito-idp:DescribeUserPool
                 Resource: "*"
               - Sid: LogsRead
                 Effect: Allow

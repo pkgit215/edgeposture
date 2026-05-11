@@ -252,13 +252,30 @@ def setup_info(account_id: Optional[str] = None) -> Dict[str, Any]:
 # ---------- Phase 1 audit lifecycle (extended) -------------------------------
 
 
+def _utc_iso(d: Any) -> Any:
+    """Phase 5.2.2 — emit an unambiguous UTC ISO string with a 'Z' suffix.
+
+    pymongo returns BSON Date as tz-naive Python datetime; calling
+    `.isoformat()` on that produces `'2026-05-11T14:01:50.651000'` with no
+    offset. JS `new Date()` then interprets that as LOCAL time, displaying
+    timestamps off by the local UTC offset (the user's "4 hours ahead"
+    report). Force UTC interpretation at the serialization boundary.
+    """
+    if not isinstance(d, datetime):
+        return d
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    else:
+        d = d.astimezone(timezone.utc)
+    return d.isoformat().replace("+00:00", "Z")
+
+
 def _serialize_run(doc: Dict[str, Any]) -> Dict[str, Any]:
     out = {k: v for k, v in doc.items() if k != "_id"}
     out["id"] = str(doc["_id"])
     for ts_field in ("created_at", "started_at", "completed_at"):
-        v = out.get(ts_field)
-        if isinstance(v, datetime):
-            out[ts_field] = v.isoformat()
+        if ts_field in out:
+            out[ts_field] = _utc_iso(out[ts_field])
     return out
 
 
@@ -266,8 +283,8 @@ def _serialize_doc(doc: Dict[str, Any]) -> Dict[str, Any]:
     out = {k: v for k, v in doc.items() if k != "_id"}
     if "_id" in doc:
         out["id"] = str(doc["_id"])
-    if isinstance(out.get("created_at"), datetime):
-        out["created_at"] = out["created_at"].isoformat()
+    if "created_at" in out:
+        out["created_at"] = _utc_iso(out["created_at"])
     return out
 
 
@@ -304,12 +321,8 @@ def _serialize_account(doc: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "account_id": doc.get("account_id"),
         "role_arn": doc.get("role_arn"),
-        "created_at": doc.get("created_at").isoformat()
-        if isinstance(doc.get("created_at"), datetime)
-        else doc.get("created_at"),
-        "last_audit_at": doc.get("last_audit_at").isoformat()
-        if isinstance(doc.get("last_audit_at"), datetime)
-        else doc.get("last_audit_at"),
+        "created_at": _utc_iso(doc.get("created_at")),
+        "last_audit_at": _utc_iso(doc.get("last_audit_at")),
     }
 
 

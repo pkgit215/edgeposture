@@ -177,11 +177,21 @@ def _load_rules_from_aws(
         # the call AccessDenied'd or the CloudFront scope returned its
         # unreliable empty. None → "unknown" attachment, NOT orphan.
         attached_resources = aws_waf.list_resources_for_web_acl(session, acl)
+        # Phase 5.2.2 — for CLOUDFRONT we also have the list-distributions
+        # payload, which carries DomainName. Re-fetch to feed
+        # friendly-name enrichment with the richer hint.
+        cf_distros_hint = None
+        if acl.get("Scope") == "CLOUDFRONT":
+            cf_distros_hint = aws_waf.list_cloudfront_distributions_for_web_acl(
+                session, acl["ARN"]
+            )
         if attached_resources is None:
-            attached_resources_list: List[str] = []
+            attached_resources_list: List[Any] = []
             attached: Optional[bool] = None  # unknown
         else:
-            attached_resources_list = list(attached_resources)
+            attached_resources_list = aws_waf.enrich_resource_friendly_names(
+                session, list(attached_resources), cf_distros=cf_distros_hint
+            )
             attached = bool(attached_resources_list)
         web_acl_summaries.append(
             {
@@ -298,10 +308,14 @@ def _resource_aware_duplicate_findings(
     """Phase 5.2 — replace naive name-based duplicate findings with
     resource-aware logic.
 
-    For each `quick_win`/`duplicate`-shaped finding whose `affected_rules`
-    list contains multiple rules with the SAME name (or substantially
-    overlapping statement_json), determine the relationship between the
-    parent Web ACLs' attached resources:
+    Phase 5.2.2 — broadened to also process findings of type
+    `rule_conflict`, `duplicate_rule`, and `conflict` (Pass-2 GPT may
+    emit any of these for cross-ACL same-name rules; the previous
+    implementation only processed `quick_win` and missed them all).
+
+    For each finding listing multiple rules with the SAME name (or
+    substantially overlapping statement_json), determine the relationship
+    between the parent Web ACLs' attached resources:
 
       * Same resource ARN in both ACLs → REAL duplicate, severity LOW,
         evidence='shared_resource'.
@@ -312,16 +326,14 @@ def _resource_aware_duplicate_findings(
       * Either ACL's attachment unknown → low-confidence "verify" finding,
         LOW, evidence='unverified', confidence=0.5.
     """
+    DUPLICATE_TYPES = {"quick_win", "rule_conflict", "duplicate_rule", "conflict"}
     by_acl_name_to_summary: Dict[str, Dict[str, Any]] = {
         a["name"]: a for a in acl_summaries
     }
     out: List[Dict[str, Any]] = []
     for f in findings:
         ftype = f.get("type")
-        # Only re-evaluate "quick_win" findings that look like cross-ACL
-        # duplicates. A naive duplicate finding will list >= 2 rules with
-        # the same name spread across >= 2 ACLs.
-        if ftype != "quick_win":
+        if ftype not in DUPLICATE_TYPES:
             out.append(f)
             continue
         affected_names = list(f.get("affected_rules") or [])
@@ -344,10 +356,24 @@ def _resource_aware_duplicate_findings(
             out.append(f)
             continue
 
+        def _arns_of(summary: Dict[str, Any]) -> set:
+            """Phase 5.2.2 — `attached_resources` is now a list of
+            `{arn,type,id,friendly}` dicts (post-friendly-name enrichment).
+            Earlier code stored bare ARN strings. Accept both shapes."""
+            out = set()
+            for item in (summary.get("attached_resources") or []):
+                if isinstance(item, dict):
+                    v = item.get("arn")
+                    if v:
+                        out.add(v)
+                elif isinstance(item, str) and item:
+                    out.add(item)
+            return out
+
         new_findings_for_pair: List[Dict[str, Any]] = []
         for rule_name, acl_names in cross_acl_groups.items():
             summaries = [by_acl_name_to_summary.get(n) or {} for n in acl_names]
-            resources_per_acl = [set(s.get("attached_resources") or []) for s in summaries]
+            resources_per_acl = [_arns_of(s) for s in summaries]
             attached_flags = [s.get("attached") for s in summaries]
             unknown = any(a is None for a in attached_flags)
             both_attached = all(a is True for a in attached_flags)

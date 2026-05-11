@@ -104,6 +104,35 @@ IAM propagation typically takes 5–15 seconds. RuleIQ's `list_resources_for_web
 already retries once after a 2-second backoff on AccessDenied to hedge the
 propagation window.
 
+## Phase 5.2.2 — IAM permissions for friendly resource names
+
+Phase 5.2.2 enriches Web ACL attachments with human-readable names (CloudFront
+DomainName / custom alias, ALB DNSName, API Gateway name) so the PDF and the
+UI show `aitrading.ninja` instead of
+`arn:aws:cloudfront::371126261144:distribution/EKOXAVPA9GX2R`. The lookups are
+optional — any AccessDenied is caught and the friendly field falls back to
+`None`, so the audit never fails on missing perms.
+
+Required actions on the audit role to populate friendly names:
+
+- `cloudfront:GetDistribution`             — CloudFront alias / domain lookup
+- `elasticloadbalancing:DescribeLoadBalancers` — ALB DNSName
+- `apigateway:GET`                         — API Gateway REST/HTTP API name
+- `cognito-idp:DescribeUserPool`           — Cognito user pool name (optional)
+
+All of these are included in the updated `cloudformation/customer-role.yaml`.
+If you already created the role pre-5.2.2, attach them inline (faster than a
+CFN stack update):
+
+```bash
+ROLE_NAME=ruleiq-audit-role   # or whatever your role is named
+
+aws iam put-role-policy \
+  --role-name $ROLE_NAME \
+  --policy-name RuleIQResourceFriendlyNames \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["elasticloadbalancing:DescribeLoadBalancers","apigateway:GET","cognito-idp:DescribeUserPool","cloudfront:GetDistribution"],"Resource":"*"}]}'
+```
+
 ### Environment variables (deployed)
 
 | Variable                          | Purpose                                                 | Default              |

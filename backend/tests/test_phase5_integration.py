@@ -563,10 +563,14 @@ def test_web_acls_populated_on_audit_run(client, db, monkeypatch):
     assert len(run["web_acls"]) == 2
     names = {a["name"] for a in run["web_acls"]}
     assert names == {"ruleiq-test-acl", "ruleiq-cf-acl"}
-    # Regional attached → attached True with ALB resource
+    # Regional attached → attached True with ALB resource (dict-shaped post-5.2.2)
     regional = next(a for a in run["web_acls"] if a["name"] == "ruleiq-test-acl")
     assert regional["attached"] is True
-    assert ALB_ARN in regional["attached_resources"]
+    arns_in_summary = [
+        (r["arn"] if isinstance(r, dict) else r)
+        for r in regional["attached_resources"]
+    ]
+    assert ALB_ARN in arns_in_summary
     # CloudFront → unknown
     cf = next(a for a in run["web_acls"] if a["name"] == "ruleiq-cf-acl")
     assert cf["attached"] is None
@@ -944,3 +948,196 @@ def test_regional_access_denied_then_retry_succeeds(monkeypatch):
     )
     # After retry succeeded with empty, must return [] (truly orphan), not None.
     assert arns == [], f"expected [], got {arns!r}; calls={call_log}"
+
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.2.2 — friendly-name enrichment + reclassifier broadening
+# ---------------------------------------------------------------------------
+
+
+class _MockELBv2Client:
+    def __init__(self, lbs: List[Dict[str, Any]], access_denied: bool = False):
+        self.lbs = lbs
+        self.access_denied = access_denied
+        self.calls: List[Dict[str, Any]] = []
+
+    def describe_load_balancers(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.access_denied:
+            raise ClientError(
+                {"Error": {"Code": "AccessDeniedException", "Message": "denied"}},
+                "DescribeLoadBalancers",
+            )
+        return {"LoadBalancers": self.lbs}
+
+
+class _MockCFGetClient:
+    def __init__(self, distros: Dict[str, Dict[str, Any]]):
+        self.distros = distros
+
+    def get_distribution(self, **kwargs):
+        d = self.distros.get(kwargs["Id"])
+        if not d:
+            raise ClientError(
+                {"Error": {"Code": "NoSuchDistribution"}}, "GetDistribution"
+            )
+        return {"Distribution": {"DistributionConfig": d}}
+
+
+class _FriendlyNameSession:
+    def __init__(self, *, elbv2_lbs=None, cf_distros_get=None, elbv2_access_denied=False):
+        self._elbv2 = _MockELBv2Client(elbv2_lbs or [], elbv2_access_denied)
+        self._cf = _MockCFGetClient(cf_distros_get or {})
+
+    def client(self, service, region_name=None):
+        if service == "elbv2":
+            return self._elbv2
+        if service == "cloudfront":
+            return self._cf
+        raise NotImplementedError(service)
+
+
+def test_friendly_name_lookup_for_alb():
+    """Phase 5.2.2: ALB ARN → DNSName via DescribeLoadBalancers."""
+    sess = _FriendlyNameSession(elbv2_lbs=[
+        {"LoadBalancerArn": ALB_ARN,
+         "DNSName": "ruleiq-test-alb-1234.us-east-1.elb.amazonaws.com",
+         "LoadBalancerName": "ruleiq-test-alb"},
+    ])
+    out = aws_waf.enrich_resource_friendly_names(sess, [ALB_ARN])
+    assert len(out) == 1
+    assert out[0]["type"] == "ALB"
+    assert out[0]["arn"] == ALB_ARN
+    assert "ruleiq-test-alb-1234.us-east-1.elb.amazonaws.com" == out[0]["friendly"]
+
+
+def test_friendly_name_lookup_for_cloudfront_alias():
+    """Phase 5.2.2: CloudFront → alias from get_distribution Aliases."""
+    sess = _FriendlyNameSession(cf_distros_get={
+        CF_DISTRO_ID: {
+            "Aliases": {"Items": ["aitrading.ninja"], "Quantity": 1}
+        }
+    })
+    out = aws_waf.enrich_resource_friendly_names(
+        sess, [CF_DISTRO_ARN],
+        cf_distros=[{"arn": CF_DISTRO_ARN, "id": CF_DISTRO_ID,
+                     "domain_name": "d1234.cloudfront.net"}],
+    )
+    assert len(out) == 1
+    assert out[0]["type"] == "CLOUDFRONT"
+    assert out[0]["id"] == CF_DISTRO_ID
+    assert out[0]["friendly"] == "aitrading.ninja"
+
+
+def test_friendly_name_lookup_falls_back_to_domain_name_when_no_alias():
+    """Phase 5.2.2: when CloudFront distribution has no custom alias,
+    fall back to the cloudfront.net domain name from the list response."""
+    sess = _FriendlyNameSession(cf_distros_get={
+        CF_DISTRO_ID: {"Aliases": {"Items": [], "Quantity": 0}}
+    })
+    out = aws_waf.enrich_resource_friendly_names(
+        sess, [CF_DISTRO_ARN],
+        cf_distros=[{"arn": CF_DISTRO_ARN, "id": CF_DISTRO_ID,
+                     "domain_name": "d1234.cloudfront.net"}],
+    )
+    assert out[0]["friendly"] == "d1234.cloudfront.net"
+
+
+def test_friendly_name_lookup_access_denied_is_graceful():
+    """Phase 5.2.2: AccessDenied on DescribeLoadBalancers must NOT fail
+    the audit — friendly is left as None."""
+    sess = _FriendlyNameSession(elbv2_access_denied=True)
+    out = aws_waf.enrich_resource_friendly_names(sess, [ALB_ARN])
+    assert out[0]["arn"] == ALB_ARN
+    assert out[0]["type"] == "ALB"
+    assert out[0]["friendly"] is None
+
+
+def test_resource_aware_handles_dict_shaped_resources():
+    """Phase 5.2.2 regression: when `attached_resources` is a list of
+    `{arn,type,id,friendly}` dicts (post-friendly-name enrichment), the
+    duplicate reclassifier must NOT crash with `unhashable type: 'dict'`.
+    """
+    finding = {
+        "type": "quick_win",
+        "severity": "low",
+        "affected_rules": ["BlockAdminPath__a", "BlockAdminPath__b"],
+        "title": "Duplicate", "description": "x", "recommendation": "y",
+        "confidence": 0.7,
+    }
+    rbm = {
+        "BlockAdminPath__a": _make_rule("BlockAdminPath", "acl-a"),
+        "BlockAdminPath__b": _make_rule("BlockAdminPath", "acl-b"),
+    }
+    rba = {"acl-a": [rbm["BlockAdminPath__a"]], "acl-b": [rbm["BlockAdminPath__b"]]}
+    summaries = [
+        {"name": "acl-a", "scope": "REGIONAL", "attached": True,
+         "attached_resources": [{"arn": ALB_ARN, "type": "ALB", "id": "alb-a", "friendly": "alb-a.example"}]},
+        {"name": "acl-b", "scope": "REGIONAL", "attached": True,
+         "attached_resources": [{"arn": ALB_ARN, "type": "ALB", "id": "alb-a", "friendly": "alb-a.example"}]},
+    ]
+    result = audit_mod._resource_aware_duplicate_findings(
+        [finding], rbm, rba, summaries
+    )
+    assert len(result) == 1
+    assert result[0]["evidence"] == "shared_resource"
+
+
+@pytest.mark.parametrize("ftype", ["rule_conflict", "duplicate_rule", "conflict"])
+def test_reclassifier_processes_non_quick_win_finding_types(ftype):
+    """Phase 5.2.2: GPT may label cross-ACL duplicates as `rule_conflict`,
+    `duplicate_rule`, or `conflict` — all three must be reclassified into
+    a `stranded_rule`-style finding when one ACL is orphan."""
+    finding = {
+        "type": ftype,
+        "severity": "medium",
+        "affected_rules": ["BlockAdminPath__a", "BlockAdminPath__b"],
+        "title": "Conflict", "description": "x", "recommendation": "y",
+        "confidence": 0.7,
+    }
+    rbm = {
+        "BlockAdminPath__a": _make_rule("BlockAdminPath", "acl-a"),
+        "BlockAdminPath__b": _make_rule("BlockAdminPath", "acl-b"),
+    }
+    rba = {"acl-a": [rbm["BlockAdminPath__a"]], "acl-b": [rbm["BlockAdminPath__b"]]}
+    summaries = [
+        {"name": "acl-a", "scope": "REGIONAL", "attached": True,
+         "attached_resources": [{"arn": ALB_ARN, "type": "ALB", "id": "alb-a", "friendly": "alb-a"}]},
+        {"name": "acl-b", "scope": "REGIONAL", "attached": False,
+         "attached_resources": []},
+    ]
+    result = audit_mod._resource_aware_duplicate_findings(
+        [finding], rbm, rba, summaries
+    )
+    assert len(result) == 1, f"expected stranded finding for {ftype}, got {result}"
+    assert result[0]["evidence"] == "stranded"
+    assert "acl-b" in result[0]["description"]
+
+
+def test_pdf_renders_friendly_names_not_raw_arns():
+    """Phase 5.2.2: the Web ACL section of the PDF prints the friendly
+    name (e.g. 'aitrading.ninja') instead of the raw distribution ARN."""
+    from services.pdf_report import render_audit_pdf
+    from pypdf import PdfReader
+    import io
+    import datetime as _dt
+
+    audit_run = {
+        "_id": "x", "account_id": "371126261144",
+        "data_source": "aws", "rule_count": 0, "web_acl_count": 1,
+        "estimated_waste_usd": 0.0, "estimated_waste_breakdown": [],
+        "created_at": _dt.datetime.now(_dt.timezone.utc),
+        "completed_at": _dt.datetime.now(_dt.timezone.utc),
+        "scopes": ["CLOUDFRONT"],
+        "web_acls": [{
+            "name": "ruleiq-cf-acl", "scope": "CLOUDFRONT", "attached": True,
+            "attached_resources": [
+                {"arn": CF_DISTRO_ARN, "type": "CLOUDFRONT",
+                 "id": CF_DISTRO_ID, "friendly": "aitrading.ninja"}
+            ],
+        }],
+    }
+    pdf = render_audit_pdf(audit_run, [], [])
+    text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
+    assert "aitrading.ninja" in text, "PDF must show friendly name"
