@@ -167,21 +167,32 @@ def _load_rules_from_aws(
     web_acl_summaries: List[Dict[str, Any]] = []
     orphan_acl_names: set = set()
     per_acl_samples: List[List[Dict[str, Any]]] = []
+    debug_log_sample: List[Dict[str, Any]] = []
+    scopes_seen: set = set()
 
     for acl in web_acls:
+        scopes_seen.add(acl.get("Scope", "REGIONAL"))
         # Phase 5 — attachment check first.
+        # Production fix: list_resources_for_web_acl now returns None when
+        # the call AccessDenied'd or the CloudFront scope returned its
+        # unreliable empty. None → "unknown" attachment, NOT orphan.
         attached_resources = aws_waf.list_resources_for_web_acl(session, acl)
-        attached = bool(attached_resources)
+        if attached_resources is None:
+            attached_resources_list: List[str] = []
+            attached: Optional[bool] = None  # unknown
+        else:
+            attached_resources_list = list(attached_resources)
+            attached = bool(attached_resources_list)
         web_acl_summaries.append(
             {
                 "name": acl["Name"],
                 "scope": acl.get("Scope", "REGIONAL"),
                 "arn": acl.get("ARN"),
-                "attached_resources": list(attached_resources),
+                "attached_resources": attached_resources_list,
                 "attached": attached,
             }
         )
-        if not attached:
+        if attached is False:  # explicit orphan only — not None
             orphan_acl_names.add(acl["Name"])
 
         log_group = aws_waf.discover_logging(session, acl["ARN"])
@@ -192,11 +203,30 @@ def _load_rules_from_aws(
             # ALLOW, so it doesn't drag back the BLOCK volume we already
             # fetched per-rule). The result is fed into Pass 3.
             try:
+                acl_debug: List[Dict[str, Any]] = []
                 sample = aws_waf.sample_suspicious_allowed_requests(
-                    session, log_group, days=log_window_days, top_k=50
+                    session, log_group, days=log_window_days, top_k=50,
+                    debug_capture=acl_debug,
                 )
+                # Phase 5 production fix: keep first 5 raw events for the
+                # audit run doc so an operator can verify the production
+                # log shape matches expectations.
+                if acl_debug and len(debug_log_sample) < 5:
+                    for ev in acl_debug:
+                        if len(debug_log_sample) >= 5:
+                            break
+                        debug_log_sample.append({
+                            "web_acl": acl["Name"],
+                            "log_group_arn": log_group,
+                            "event": ev,
+                        })
                 if sample:
                     per_acl_samples.append(sample)
+                logger.info(
+                    "Bypass sampler | acl=%s log_group=%s "
+                    "events_seen_in_debug=%d suspicious_kept=%d",
+                    acl["Name"], log_group, len(acl_debug), len(sample),
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.warning(
                     "ALLOW-traffic sampling failed for %s: %s — Pass 3 will run"
@@ -241,6 +271,8 @@ def _load_rules_from_aws(
         "web_acls": web_acl_summaries,
         "orphan_acl_names": orphan_acl_names,
         "suspicious_requests": suspicious_requests,
+        "debug_log_sample": debug_log_sample,
+        "scopes": sorted(scopes_seen),
     }
     return rules, meta
 
@@ -309,10 +341,15 @@ def _orphaned_acl_findings(
     web_acl_summaries: List[Dict[str, Any]],
     rules_by_acl: Dict[str, List[Dict[str, Any]]],
 ) -> List[Dict[str, Any]]:
-    """One `orphaned_web_acl` finding per orphaned ACL."""
+    """One `orphaned_web_acl` finding per orphaned ACL.
+
+    Production fix: only emit when `attached is False` *explicitly*.
+    `attached is None` means status is unknown (AccessDenied / CloudFront
+    unreliable) and MUST NOT produce a false-positive orphan finding.
+    """
     out: List[Dict[str, Any]] = []
     for acl in web_acl_summaries:
-        if acl.get("attached"):
+        if acl.get("attached") is not False:
             continue
         acl_name = acl["name"]
         rule_names = [r["rule_name"] for r in rules_by_acl.get(acl_name, [])]
@@ -499,6 +536,12 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                     "suspicious_request_sample": meta.get(
                         "suspicious_requests"
                     ) or [],
+                    # Phase 5 production debug — first 5 raw log events
+                    # actually fetched by the bypass sampler. Lets an
+                    # operator diagnose log-shape surprises when production
+                    # results don't match expectations.
+                    "debug_log_sample": meta.get("debug_log_sample") or [],
+                    "scopes": meta.get("scopes") or [],
                 }
             },
         )

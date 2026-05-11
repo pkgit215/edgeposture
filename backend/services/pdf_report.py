@@ -519,15 +519,18 @@ def _build_web_acl_section(audit_run: Dict[str, Any],
     ]]
     orphan_idx: List[int] = []
     for i, acl in enumerate(web_acls, start=1):
-        attached = bool(acl.get("attached"))
+        attached = acl.get("attached")
         resources = acl.get("attached_resources") or []
-        if attached:
+        if attached is True:
             status_para = Paragraph("Attached", cell_bold)
             resource_text = _fmt_int(len(resources)) + " resource(s)"
-        else:
+        elif attached is False:
             orphan_idx.append(i)
             status_para = Paragraph("ORPHANED", cell_orphan)
             resource_text = "none"
+        else:  # None — unknown (AccessDenied / CloudFront unreliable)
+            status_para = Paragraph("Unknown", cell_bold)
+            resource_text = "could not verify"
         rows.append([
             Paragraph(str(acl.get("name") or "—"), cell_bold),
             Paragraph(str(acl.get("scope") or "REGIONAL"), cell),
@@ -613,7 +616,11 @@ def _build_inventory_table(rules: Sequence[Dict[str, Any]],
             last_cell = "Never fired"
         else:
             last_cell = _fmt_last_fired(last)
-        mode = str(r.get("action") or "—").upper()
+        mode = str(r.get("action") or "—")
+        # Phase 5 production fix: preserve case so "Block (group)" /
+        # "Count (override)" don't get upper-cased into noise.
+        if mode in ("ALLOW", "BLOCK", "COUNT", "CAPTCHA", "CHALLENGE"):
+            mode = mode.upper()
         status = _rule_status(r)
         if status == "FMS-managed":
             fms_idx.append(i)

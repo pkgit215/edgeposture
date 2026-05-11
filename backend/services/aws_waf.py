@@ -129,6 +129,12 @@ def get_web_acl_rules(
     boto3 returns ByteMatchStatement.SearchString (and a few IPSet/Forwarded
     fields) as raw bytes. We normalize the entire Statement subtree to JSON
     primitives here so downstream code never sees bytes.
+
+    Phase 5 production fix: also iterate
+    `PreProcessFirewallManagerRuleGroups` and
+    `PostProcessFirewallManagerRuleGroups` — FMS-deployed managed rule
+    groups live there, NOT in `acl["Rules"]`, and were being dropped by
+    Phase 5's first pass causing the "Mode: ALLOW" misread on the PDF.
     """
     scope = web_acl.get("Scope", "REGIONAL")
     region = "us-east-1" if scope == "CLOUDFRONT" else web_acl.get("Region", DEFAULT_REGION)
@@ -137,10 +143,43 @@ def get_web_acl_rules(
         Name=web_acl["Name"], Scope=scope, Id=web_acl["Id"]
     )
     acl = resp["WebACL"]
+
+    raw_rules: List[Dict[str, Any]] = []
+    raw_rules.extend(acl.get("Rules", []) or [])
+    # FMS pre/post-process rule groups also need to surface to the audit.
+    # boto3 returns them as wrappers with a synthetic `FirewallManagerStatement`;
+    # we synthesise rule entries so they appear in the inventory with kind=managed.
+    for prefix, source in (
+        ("FMSPreProcess-", acl.get("PreProcessFirewallManagerRuleGroups", []) or []),
+        ("FMSPostProcess-", acl.get("PostProcessFirewallManagerRuleGroups", []) or []),
+    ):
+        for grp in source:
+            raw_rules.append({
+                "Name": prefix + (grp.get("Name") or "unknown"),
+                "Priority": grp.get("Priority", 0),
+                "Statement": {
+                    "ManagedRuleGroupStatement": {
+                        "VendorName": (grp.get("FirewallManagerStatement") or {})
+                            .get("ManagedRuleGroupStatement", {})
+                            .get("VendorName", "AWS"),
+                        "Name": (grp.get("FirewallManagerStatement") or {})
+                            .get("ManagedRuleGroupStatement", {})
+                            .get("Name", grp.get("Name", "unknown")),
+                    }
+                },
+                "OverrideAction": grp.get("OverrideAction") or {"None": {}},
+                "ManagedByFirewallManager": True,
+            })
+
     rules: List[Dict[str, Any]] = []
-    for r in acl.get("Rules", []):
+    for r in raw_rules:
         statement = _normalize_for_json(r.get("Statement", {}))
         kind = classify_rule_kind(statement)
+        # Phase 5 production fix: presence of OverrideAction always means
+        # managed-style (the rule references a rule group, AWS-managed or
+        # customer-managed). Trust the field, not just the Statement shape.
+        if "OverrideAction" in r and r.get("OverrideAction"):
+            kind = "managed"
         mode = derive_mode(r, kind)
         override_action = None
         ovr = r.get("OverrideAction") or {}
@@ -163,10 +202,16 @@ def get_web_acl_rules(
 
 
 def classify_rule_kind(statement: Dict[str, Any]) -> str:
-    """Phase 5: 'managed' vs 'rate_based' vs 'custom'."""
+    """Phase 5: 'managed' vs 'rate_based' vs 'custom'.
+
+    Production fix: also treat `RuleGroupReferenceStatement` (customer-
+    owned rule groups) as managed-style so its mode renders correctly.
+    """
     if not isinstance(statement, dict):
         return "custom"
     if "ManagedRuleGroupStatement" in statement:
+        return "managed"
+    if "RuleGroupReferenceStatement" in statement:
         return "managed"
     if "RateBasedStatement" in statement:
         return "rate_based"
@@ -175,7 +220,10 @@ def classify_rule_kind(statement: Dict[str, Any]) -> str:
         inner = statement.get(combinator) or {}
         stmts = inner.get("Statements") or ([inner.get("Statement")] if inner.get("Statement") else [])
         for s in stmts:
-            if isinstance(s, dict) and "ManagedRuleGroupStatement" in s:
+            if isinstance(s, dict) and (
+                "ManagedRuleGroupStatement" in s
+                or "RuleGroupReferenceStatement" in s
+            ):
                 return "managed"
             if isinstance(s, dict) and "RateBasedStatement" in s:
                 return "rate_based"
@@ -185,6 +233,11 @@ def classify_rule_kind(statement: Dict[str, Any]) -> str:
 def derive_mode(rule: Dict[str, Any], kind: str) -> str:
     """Phase 5: human-readable rule action, fixing the OverrideAction misread.
 
+    Production fix: presence of `OverrideAction` ALWAYS forces managed
+    branch — this is the field AWS uses to signal "this rule is a group
+    reference". Don't rely on the kind classifier alone (it can miss
+    edge cases like custom rule groups or FMS pre/post rules).
+
     For managed rule groups:
       OverrideAction.None  → 'Block (group)'      (group's own per-sub-rule actions apply)
       OverrideAction.Count → 'Count (override)'   (operator override — observe only)
@@ -193,7 +246,10 @@ def derive_mode(rule: Dict[str, Any], kind: str) -> str:
     For custom rules:
       Action.Block/Allow/Count/Captcha/Challenge → upper-case label
     """
-    if kind == "managed":
+    # Phase 5 production fix: OverrideAction presence is the canonical
+    # signal of a managed/group-reference rule.
+    has_override = bool(rule.get("OverrideAction"))
+    if kind == "managed" or has_override:
         ovr = rule.get("OverrideAction") or {}
         if "Count" in ovr:
             return "Count (override)"
@@ -213,25 +269,57 @@ def _derive_action(rule: Dict[str, Any]) -> str:
 
 def list_resources_for_web_acl(
     session: boto3.Session, web_acl: Dict[str, Any]
-) -> List[str]:
-    """Phase 5: Return all resource ARNs (ALB, API Gateway, AppSync, etc.) the
-    Web ACL is associated with. For CLOUDFRONT scope, returns distribution
-    IDs (which AWS treats as resources here). Empty list = orphaned ACL.
+) -> Optional[List[str]]:
+    """Phase 5: Return all resource ARNs the Web ACL is associated with.
 
-    All boto3/moto errors degrade gracefully to an empty list rather than
-    failing the audit — older test rigs (moto) don't implement this API.
+    Return semantics (production fix):
+      * `[]`   → ACL is genuinely orphaned (API succeeded, no associations)
+      * `None` → attachment status UNKNOWN (AccessDenied / API not supported
+                  for this scope). Callers MUST NOT treat None as orphan.
+      * `[...]`→ attached to the listed resources.
+
+    For CLOUDFRONT scope the WAFv2 API only enumerates *some* distribution
+    associations — distributions associated via the CloudFront side are
+    not always reported. We treat that case as 'unknown' to avoid
+    false-positive orphan findings on CloudFront ACLs.
     """
     scope = web_acl.get("Scope", "REGIONAL")
     arns: List[str] = []
+    saw_success = False
     region = "us-east-1" if scope == "CLOUDFRONT" else web_acl.get("Region", DEFAULT_REGION)
     client = session.client("wafv2", region_name=region)
+
+    def _is_access_denied(exc: Exception) -> bool:
+        code = getattr(getattr(exc, "response", {}), "get", lambda *_: {})("Error", {}).get("Code") if hasattr(exc, "response") else None
+        return code in ("AccessDeniedException", "AccessDenied", "UnauthorizedOperation")
+
     if scope == "CLOUDFRONT":
+        # CloudFront associations live on the CloudFront side; WAFv2's
+        # list_resources_for_web_acl on CLOUDFRONT scope returns an empty
+        # list even for attached ACLs. Treat as 'unknown' rather than
+        # claiming orphan.
         try:
             resp = client.list_resources_for_web_acl(WebACLArn=web_acl["ARN"])
+            saw_success = True
             for r in resp.get("ResourceArns", []) or []:
                 arns.append(r)
-        except (ClientError, NotImplementedError, Exception) as exc:  # noqa: BLE001
+        except ClientError as exc:
+            if _is_access_denied(exc):
+                logger.warning(
+                    "list_resources_for_web_acl CLOUDFRONT AccessDenied for %s — "
+                    "IAM role missing wafv2:ListResourcesForWebACL. Treating as UNKNOWN.",
+                    web_acl.get("Name"),
+                )
+                return None
             logger.warning("list_resources_for_web_acl CLOUDFRONT failed: %s", exc)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("list_resources_for_web_acl CLOUDFRONT failed: %s", exc)
+            return None
+        # CloudFront returns from this API are unreliable — even on success
+        # with [], the ACL may be attached via the CF side. Don't claim
+        # orphan: return None when CF returned [].
+        if saw_success and not arns:
+            return None
         return arns
 
     # REGIONAL — iterate the documented resource types.
@@ -247,11 +335,23 @@ def list_resources_for_web_acl(
             resp = client.list_resources_for_web_acl(
                 WebACLArn=web_acl["ARN"], ResourceType=rt
             )
+            saw_success = True
             for r in resp.get("ResourceArns", []) or []:
                 arns.append(r)
-        except (ClientError, NotImplementedError, Exception) as exc:  # noqa: BLE001
-            # Older SDKs / unsupported resource types / moto stubs.
+        except ClientError as exc:
+            if _is_access_denied(exc):
+                logger.warning(
+                    "list_resources_for_web_acl REGIONAL AccessDenied for %s — "
+                    "IAM role missing wafv2:ListResourcesForWebACL. Treating as UNKNOWN.",
+                    web_acl.get("Name"),
+                )
+                return None
             logger.debug("list_resources_for_web_acl %s skipped: %s", rt, exc)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("list_resources_for_web_acl %s skipped: %s", rt, exc)
+    # If we never got a single successful API call, status is unknown.
+    if not saw_success:
+        return None
     return arns
 
 
@@ -302,65 +402,86 @@ def score_request_suspicion(req: Dict[str, Any]) -> int:
     """Return an additive 0..N 'attack-shapedness' score for one parsed
     WAFv2 log event.
 
+    Production fix: URL-decode `uri` and `args` before pattern matching.
+    Real WAF logs preserve URL-encoding (`%3Cscript%3E`, `%27+OR+%271%27%3D%271`),
+    which would never match the literal `<script` / `' or '1'='1` tokens.
+    Scoring takes the MAX of raw-form and decoded-form matches per family
+    so deliberately encoded attacks aren't lost either.
+
     Signatures (see spec § Phase 5.5):
       * Shellshock in any header value:                +10
       * ${jndi: anywhere in headers/uri/args:          +10
       * SQLi tokens in uri or args:                    +8
       * XSS tokens in uri or args:                     +6
-      * Path-traversal / LFI tokens in uri:            +6  (also +6 if /etc/passwd etc)
+      * Path-traversal / LFI tokens in uri:            +6
       * Command-injection tokens in uri or args:       +6
       * Admin / sensitive-path prefix on uri:          +4
       * Known scanner User-Agent:                      +4
-
-    No upper cap — multi-signature attacks naturally accumulate higher.
-    A score >= SUSPICION_THRESHOLD (4) marks the request as a candidate
-    for inclusion in the Pass-3 bypass sample.
     """
+    from urllib.parse import unquote_plus
+
     score = 0
     http = req.get("httpRequest") or {}
-    uri = (http.get("uri") or "").lower()
-    args = (http.get("args") or "").lower()
-    headers = http.get("headers") or []
+    uri_raw = (http.get("uri") or "").lower()
+    args_raw = (http.get("args") or "").lower()
+    try:
+        uri_dec = unquote_plus(uri_raw, errors="replace")
+        args_dec = unquote_plus(args_raw, errors="replace")
+    except Exception:  # noqa: BLE001
+        uri_dec, args_dec = uri_raw, args_raw
 
-    # Flatten headers once.
-    header_values = []
+    headers = http.get("headers") or []
+    # Headers are a list of {name, value} dicts. AWS CF-source uses
+    # lowercase names; ALB-source uses Title-Case. Normalise name lookup.
+    header_values: List[str] = []
     ua = ""
     for h in headers:
-        v = (h.get("value") or "").lower()
-        header_values.append(v)
+        v_raw = (h.get("value") or "").lower()
+        try:
+            v_dec = unquote_plus(v_raw, errors="replace")
+        except Exception:  # noqa: BLE001
+            v_dec = v_raw
+        # Score on both forms — store decoded so signature checks succeed.
+        header_values.append(v_dec if v_dec != v_raw else v_raw)
+        if v_dec != v_raw:
+            header_values.append(v_raw)
         if (h.get("name") or "").lower() == "user-agent":
-            ua = v
+            ua = v_dec or v_raw
 
-    # Shellshock — header-only signature, signature itself is unambiguous.
-    for hv in header_values:
-        if any(tok in hv for tok in _SHELLSHOCK_TOKENS):
-            score += _S_SHELLSHOCK
-            break
+    def _hit(tokens, *haystacks):
+        for hay in haystacks:
+            if any(tok in hay for tok in tokens):
+                return True
+        return False
 
-    # Log4Shell / JNDI — header, uri, or args.
-    haystack_for_jndi = " ".join([uri, args, *header_values])
-    if any(tok in haystack_for_jndi for tok in _LOG4SHELL_TOKENS):
+    # Shellshock — header-only signature.
+    if _hit(_SHELLSHOCK_TOKENS, *header_values):
+        score += _S_SHELLSHOCK
+
+    # Log4Shell / JNDI — header, uri, or args (raw OR decoded).
+    jndi_hay = " ".join([uri_raw, args_raw, uri_dec, args_dec, *header_values])
+    if _hit(_LOG4SHELL_TOKENS, jndi_hay):
         score += _S_LOG4SHELL
 
     # SQLi.
-    haystack_for_payload = uri + " " + args
-    if any(tok in haystack_for_payload for tok in _SQLI_TOKENS):
+    if _hit(_SQLI_TOKENS, uri_raw + " " + args_raw, uri_dec + " " + args_dec):
         score += _S_SQLI
 
     # XSS.
-    if any(tok in haystack_for_payload for tok in _XSS_TOKENS):
+    if _hit(_XSS_TOKENS, uri_raw + " " + args_raw, uri_dec + " " + args_dec):
         score += _S_XSS
 
-    # LFI / path traversal — primarily uri.
-    if any(tok in uri for tok in _LFI_TOKENS):
+    # LFI / path traversal — uri only.
+    if _hit(_LFI_TOKENS, uri_raw, uri_dec):
         score += _S_LFI
 
     # Command injection.
-    if any(tok in haystack_for_payload for tok in _CMD_INJECTION_TOKENS):
+    if _hit(_CMD_INJECTION_TOKENS, uri_raw + " " + args_raw, uri_dec + " " + args_dec):
         score += _S_CMD
 
-    # Admin / sensitive paths — uri prefix only.
-    if any(uri.startswith(p) for p in _ADMIN_PATH_TOKENS):
+    # Admin / sensitive paths — uri prefix only (decoded form to match
+    # `%2Fadmin` -> `/admin`).
+    if any(uri_dec.startswith(p) or uri_raw.startswith(p) for p in _ADMIN_PATH_TOKENS):
         score += _S_ADMIN
 
     # Scanner UA.
@@ -378,6 +499,7 @@ def sample_suspicious_allowed_requests(
     *,
     logs_client: Any = None,
     max_events_scanned: int = 200_000,
+    debug_capture: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Phase 5.5 — page CloudWatch Logs for ALLOW events on this Web ACL's
     log group and return the global top-K by `score_request_suspicion`.
@@ -390,6 +512,12 @@ def sample_suspicious_allowed_requests(
     Returns a list of parsed-JSON log events sorted by score desc, each
     annotated with an internal `_suspicion_score` field. Empty input
     (no logs, or no events scoring above SUSPICION_THRESHOLD) ⇒ [].
+
+    Phase 5 production fix:
+      * `debug_capture` if provided is filled with up to 5 RAW parsed
+        events (the first 5 actually fetched) for post-hoc diagnosis of
+        WAF-log-shape surprises in production. Audit pipeline persists
+        these onto `audit_runs.debug_log_sample`.
     """
     region = _region_from_arn(log_group_arn) or DEFAULT_REGION
     if logs_client is None:
@@ -407,6 +535,7 @@ def sample_suspicious_allowed_requests(
     next_token: Optional[str] = None
     scanned = 0
     tie = 0
+    debug_captured = 0
 
     while scanned < max_events_scanned:
         kwargs: Dict[str, Any] = {
@@ -433,6 +562,11 @@ def sample_suspicious_allowed_requests(
                 parsed = json.loads(ev.get("message", "{}"))
             except json.JSONDecodeError:
                 continue
+            # Phase 5 production debug — capture first 5 RAW events (before
+            # action-filter / scoring) so the caller can diagnose log shape.
+            if debug_capture is not None and debug_captured < 5:
+                debug_capture.append(parsed)
+                debug_captured += 1
             if parsed.get("action") != "ALLOW":
                 continue  # defence-in-depth — server filter SHOULD have caught
             score = score_request_suspicion(parsed)
