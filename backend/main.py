@@ -587,6 +587,40 @@ def get_audit_report_pdf(audit_id: str) -> Response:
 # Dockerfile copies the Vite build to /app/static. In local dev the directory
 # is absent and the SPA simply isn't served — `/api/*` continues to work.
 # IMPORTANT: registered AFTER all `/api/*` routes so they take precedence.
+#
+# Fix #28 — cache headers:
+#   * index.html is served with `Cache-Control: no-cache, must-revalidate`
+#     (plus Pragma + Expires for old proxies). Vite hashes asset filenames
+#     per build, so index.html is the ONLY artefact whose contents change
+#     under a stable URL — caching it means users keep loading deleted
+#     hashed bundles after a deploy.
+#   * Hashed assets under /assets/* are immutable: `Cache-Control:
+#     public, max-age=31536000, immutable`. The filename changes whenever
+#     contents change, so aggressive caching is correct.
+
+_INDEX_NO_CACHE_HEADERS: Dict[str, str] = {
+    "Cache-Control": "no-cache, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+_ASSET_IMMUTABLE_HEADERS: Dict[str, str] = {
+    "Cache-Control": "public, max-age=31536000, immutable",
+}
+
+
+class _ImmutableAssetsStaticFiles(StaticFiles):
+    """StaticFiles subclass that stamps long-cache headers on every file.
+
+    Used only for `/assets/*`, where Vite emits hash-named bundles
+    (`index-abc123.js`). Filenames change whenever contents change, so
+    1-year immutable caching is the correct trade-off."""
+
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        resp = await super().get_response(path, scope)
+        if resp.status_code == 200:
+            for k, v in _ASSET_IMMUTABLE_HEADERS.items():
+                resp.headers[k] = v
+        return resp
 
 
 def _mount_spa_if_built(app_: FastAPI, dist_dir: Path) -> None:
@@ -599,13 +633,16 @@ def _mount_spa_if_built(app_: FastAPI, dist_dir: Path) -> None:
     if assets_dir.is_dir():
         app_.mount(
             "/assets",
-            StaticFiles(directory=str(assets_dir)),
+            _ImmutableAssetsStaticFiles(directory=str(assets_dir)),
             name="spa-assets",
         )
 
+    def _index_response() -> FileResponse:
+        return FileResponse(str(index_path), headers=_INDEX_NO_CACHE_HEADERS)
+
     @app_.get("/", include_in_schema=False)
     def _spa_root() -> FileResponse:  # noqa: D401
-        return FileResponse(str(index_path))
+        return _index_response()
 
     @app_.get("/{full_path:path}", include_in_schema=False)
     def _spa_catchall(full_path: str) -> FileResponse:
@@ -615,10 +652,13 @@ def _mount_spa_if_built(app_: FastAPI, dist_dir: Path) -> None:
             raise HTTPException(status_code=404)
         candidate = dist_dir / full_path
         if candidate.is_file():
+            # Non-asset top-level files (favicon, robots.txt, etc.) — short
+            # cache, not immutable, since their filenames don't change.
             return FileResponse(str(candidate))
         # SPA fallback — serve index.html so client-side state navigation works
-        # on direct URL hits / refresh.
-        return FileResponse(str(index_path))
+        # on direct URL hits / refresh. MUST carry no-cache headers so that
+        # /demo, /connect, /history etc. always pick up the latest bundle.
+        return _index_response()
 
     logger.info("SPA mounted from %s", dist_dir)
 
