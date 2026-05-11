@@ -45,14 +45,25 @@ SEV_LOW = colors.HexColor("#6b7280")    # gray-500
 
 SEV_COLOR = {"high": SEV_HIGH, "medium": SEV_MED, "low": SEV_LOW}
 
-TYPE_ORDER = ["dead_rule", "bypass_candidate", "conflict", "quick_win", "fms_review", "orphaned_web_acl"]
+TYPE_ORDER = [
+    "bypass_candidate", "dead_rule", "stranded_rule", "rule_conflict",
+    "conflict", "quick_win", "count_mode_high_volume",
+    "count_mode_with_hits", "count_mode_long_duration",
+    "managed_rule_override_count", "fms_review", "orphaned_web_acl",
+]
 TYPE_LABEL = {
     "dead_rule": "Dead rules",
     "bypass_candidate": "Bypass candidates",
     "conflict": "Rule conflicts",
+    "rule_conflict": "Rule conflicts",
     "quick_win": "Quick wins",
+    "stranded_rule": "Stranded rules (orphaned ACL)",
     "fms_review": "FMS-managed review items",
     "orphaned_web_acl": "Orphaned Web ACLs",
+    "count_mode_with_hits": "COUNT-mode rules matching traffic",
+    "count_mode_high_volume": "High-volume COUNT rules (promote to BLOCK)",
+    "count_mode_long_duration": "Long-running COUNT rules",
+    "managed_rule_override_count": "Managed-group sub-rule COUNT overrides",
 }
 
 
@@ -159,10 +170,13 @@ def _make_footer(generated_at: str):
 def _summary_stats(audit_run: Dict[str, Any], rules: Sequence[Dict[str, Any]],
                    findings: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     sev = {"high": 0, "medium": 0, "low": 0}
+    by_type: Dict[str, int] = {}
     for f in findings:
         s = (f.get("severity") or "low").lower()
         if s in sev:
             sev[s] += 1
+        t = f.get("type") or ""
+        by_type[t] = by_type.get(t, 0) + 1
     zero_hit = sum(1 for r in rules if int(r.get("hit_count") or 0) == 0)
     waste = audit_run.get("estimated_waste_usd")
     if waste is None:
@@ -175,6 +189,13 @@ def _summary_stats(audit_run: Dict[str, Any], rules: Sequence[Dict[str, Any]],
         "sev_low": sev["low"],
         "zero_hit": zero_hit,
         "waste_usd": waste,
+        "bypass_count": by_type.get("bypass_candidate", 0),
+        "stranded_count": by_type.get("stranded_rule", 0),
+        "orphan_count": by_type.get("orphaned_web_acl", 0),
+        "dead_count": by_type.get("dead_rule", 0),
+        "count_with_hits": by_type.get("count_mode_with_hits", 0),
+        "count_high_volume": by_type.get("count_mode_high_volume", 0),
+        "override_count": by_type.get("managed_rule_override_count", 0),
     }
 
 
@@ -244,6 +265,47 @@ def _build_cover(audit_run: Dict[str, Any], stats: Dict[str, Any],
     ]))
     out.append(ct)
     out.append(Spacer(1, 16))
+
+    # Phase 5.3.4 — value reframing: lead with security posture, not waste.
+    out.append(Paragraph("Security posture", S["h3"]))
+    sec_lines = [
+        f"<b>{stats['sev_high']}</b> high-severity issues require attention.",
+    ]
+    if stats.get("bypass_count"):
+        sec_lines.append(
+            f"<b>{stats['bypass_count']}</b> potential WAF bypass(es) observed "
+            "in real traffic — attack-shaped requests reaching origin."
+        )
+    if stats.get("stranded_count"):
+        sec_lines.append(
+            f"<b>{stats['stranded_count']}</b> stranded rule(s) protecting nothing."
+        )
+    if stats.get("count_high_volume"):
+        sec_lines.append(
+            f"<b>{stats['count_high_volume']}</b> high-volume COUNT rule(s) "
+            "worth promoting to BLOCK."
+        )
+    for line in sec_lines:
+        out.append(Paragraph(line, S["body_small"]))
+
+    out.append(Spacer(1, 8))
+    out.append(Paragraph("Operational hygiene", S["h3"]))
+    hyg_lines = [
+        f"<b>{stats.get('orphan_count', 0)}</b> orphaned Web ACL(s) detected.",
+        f"<b>{stats.get('dead_count', 0)}</b> dead custom rule(s).",
+        f"<b>{stats.get('count_with_hits', 0)}</b> rule(s) in COUNT mode worth review.",
+        f"<b>{stats.get('override_count', 0)}</b> managed-group sub-rule override(s).",
+    ]
+    for line in hyg_lines:
+        out.append(Paragraph(line, S["body_small"]))
+
+    out.append(Spacer(1, 8))
+    out.append(Paragraph(
+        f"<font color='{MUTED.hexval()}'>Cost optimization: "
+        f"<b>${int(stats['waste_usd']):,}</b>/month identified.</font>",
+        S["body_small"],
+    ))
+    out.append(Spacer(1, 12))
     out.append(_what_was_tested(audit_run, S))
     out.append(PageBreak())
     return out
@@ -449,7 +511,55 @@ def _render_finding(f: Dict[str, Any], fms_set: set,
         ("BACKGROUND", (0, 0), (-1, -1), ROW_ALT),
         ("BOX", (0, 0), (-1, -1), 0.4, HAIRLINE),
     ]))
+
+    # Phase 5.3.1 — Remediation block.
+    remediation = f.get("remediation") or {}
+    if remediation:
+        rem_block = _render_remediation_block(remediation, sev, S)
+        return KeepTogether([row, Spacer(1, 2), rem_block])
     return KeepTogether(row)
+
+
+def _render_remediation_block(
+    rem: Dict[str, Any], severity: str, S: Dict[str, ParagraphStyle]
+) -> Flowable:
+    """Phase 5.3.1 — canned remediation block beneath each finding card."""
+    actions = rem.get("suggested_actions") or []
+    verify = rem.get("verify_by") or ""
+    disclaimer = rem.get("disclaimer") or ""
+
+    actions_html = "<br/>".join(f"• {a}" for a in actions) or "—"
+    content = [
+        Paragraph(
+            f"<b>Remediation</b>",
+            S["body_small"],
+        ),
+        Paragraph(
+            f"<font color='{MUTED.hexval()}'><b>Suggested actions:</b></font><br/>"
+            f"{actions_html}",
+            S["body_small"],
+        ),
+        Paragraph(
+            f"<font color='{MUTED.hexval()}'><b>Verify by:</b></font> {verify}",
+            S["body_small"],
+        ),
+        Paragraph(
+            f"<font color='{MUTED.hexval()}' size=7><i>{disclaimer}</i></font>",
+            S["body_small"],
+        ),
+    ]
+    bar = _SeverityBar(severity, height=14 * len(content))
+    tbl = Table([[bar, content]], colWidths=[0.12 * inch, 6.0 * inch])
+    tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (1, 0), (1, 0), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f1f5f9")),
+        ("BOX", (0, 0), (-1, -1), 0.3, HAIRLINE),
+    ]))
+    return tbl
 
 
 def _rule_status(rule: Dict[str, Any]) -> str:
@@ -631,6 +741,10 @@ def _build_inventory_table(rules: Sequence[Dict[str, Any]],
 
     for i, r in enumerate(sorted_rules, start=1):
         name = str(r.get("rule_name") or "—")
+        # Phase 5.3.3 — show sub-rule override count badge next to managed groups.
+        overrides = r.get("managed_rule_overrides") or []
+        if overrides:
+            name = f"{name}  ({len(overrides)} override{'s' if len(overrides)!=1 else ''})"
         acl = str(r.get("web_acl_name") or "—")
         hits = int(r.get("hit_count") or 0)
         total_hits += hits

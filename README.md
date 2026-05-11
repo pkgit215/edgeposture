@@ -2,6 +2,16 @@
 
 AI-powered AWS WAF audit tool. Two-pass LLM pipeline that explains every WAF rule and surfaces dead rules, potential bypasses, conflicts, quick wins, and FMS-managed review items — without ever recommending changes the customer cannot make.
 
+## Why RuleIQ
+
+1. **Find active security gaps.** Detect attack patterns reaching origin (shellshock-class bypasses, URL-encoded XSS, SQLi probes) by analyzing what the WAF allowed vs. what should have been blocked. RuleIQ inspects real CloudWatch log traffic, not just rule definitions.
+2. **Hand-off-ready audit artifact.** A single PDF a security engineer takes to a SOC2 / PCI / ISO27001 auditor — replaces weeks of manual rule documentation. Every finding includes canned remediation guidance with verify-by steps.
+3. **Cut through rule rot.** Find rules with no institutional memory, no current traffic match, COUNT-mode states that have been forgotten, and stale assumptions about what's "still on." Surface them with context for safe cleanup.
+4. **Onboarding accelerator.** A new security hire understands the WAF posture in 10 minutes vs. 3 weeks of console spelunking. The Web ACL Attachment + Rule Inventory tables answer "what protects what" without paging through 8 AWS console screens.
+5. **M&A / due diligence.** Audit a target company's WAF posture in minutes during deal evaluation — fold the PDF straight into the data-room deliverables.
+6. **Operational continuous monitoring _(roadmap)_.** Weekly delta reports + Slack alerts on HIGH findings catch config drift in days, not at the next annual audit.
+7. **Cost optimization (bonus).** Dead rules and orphaned ACLs incur fixed monthly fees regardless of traffic. RuleIQ surfaces the dollar number, but treat it as a hygiene signal, not the headline.
+
 ## Phase status
 
 - **Phase 0** (deployed): FastAPI shell, fixture rules, two-pass pipeline.

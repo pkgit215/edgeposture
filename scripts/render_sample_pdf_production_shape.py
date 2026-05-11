@@ -70,12 +70,55 @@ def main():
          "ARN": CLOUDFRONT_ACL_ARN},
     ]
     aws_waf.enrich_fms = lambda *_a, **_kw: {"available": True, "policies": []}
-    # Synthesise hit counts: zero for the managed groups so they show in
-    # the inventory as "Block (group)" with hit_count=0 (the production
-    # case the user reported).
-    aws_waf.get_rule_stats = lambda *_a, **_kw: {
-        "hit_count": 0, "last_fired": None, "count_mode_hits": 0, "sample_uris": []
-    }
+    # Phase 5.3 — inject a COUNT-mode rule and a managed group with
+    # sub-rule overrides so the sample exercises the new finding types.
+    def _stub_rules(session, web_acl):
+        if web_acl.get("Scope") == "CLOUDFRONT":
+            return [
+                {
+                    "rule_name": "AWS-Common", "priority": 0,
+                    "action": "Block (group)", "rule_kind": "managed",
+                    "statement_json": {"ManagedRuleGroupStatement": {
+                        "VendorName": "AWS",
+                        "Name": "AWSManagedRulesCommonRuleSet",
+                    }},
+                    "override_action": "None", "fms_managed": False,
+                    "managed_rule_overrides": [
+                        {"name": "SizeRestrictions_BODY", "action": "Count"},
+                    ],
+                },
+                {
+                    "rule_name": "BlockShellshockUA", "priority": 10,
+                    "action": "COUNT", "rule_kind": "custom",
+                    "statement_json": {"ByteMatchStatement": {
+                        "SearchString": "() { :; };",
+                        "FieldToMatch": {"SingleHeader": {"Name": "user-agent"}},
+                    }},
+                    "override_action": None, "fms_managed": False,
+                    "managed_rule_overrides": [],
+                },
+            ]
+        return [
+            {
+                "rule_name": "LegacyDeadRule", "priority": 5,
+                "action": "BLOCK", "rule_kind": "custom",
+                "statement_json": {"ByteMatchStatement": {}},
+                "override_action": None, "fms_managed": False,
+                "managed_rule_overrides": [],
+            },
+        ]
+    aws_waf.get_web_acl_rules = _stub_rules
+    # Synthesise hit counts — `BlockShellshockUA` is COUNT with 5,000 hits
+    # so it produces both `count_mode_with_hits` and
+    # `count_mode_high_volume` findings.
+    def _stats(session, log_group, rule_name, web_acl_name,
+              days=30, **_kw):
+        if rule_name == "BlockShellshockUA":
+            return {"hit_count": 5000, "last_fired": None,
+                    "count_mode_hits": 5000, "sample_uris": []}
+        return {"hit_count": 0, "last_fired": None,
+                "count_mode_hits": 0, "sample_uris": []}
+    aws_waf.get_rule_stats = _stats
     aws_waf.discover_logging = lambda *_a, **_kw: LOG_GROUP_ARN
 
     # Mock the LLM pipeline so we don't call OpenAI. We construct realistic

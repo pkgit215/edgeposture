@@ -187,6 +187,22 @@ def get_web_acl_rules(
             override_action = "None"
         elif "Count" in ovr:
             override_action = "Count"
+        # Phase 5.3.3 — extract sub-rule action overrides inside a
+        # managed rule group (e.g. SizeRestrictions_BODY → Count).
+        sub_overrides: List[Dict[str, str]] = []
+        if isinstance(statement, dict):
+            mrg = statement.get("ManagedRuleGroupStatement")
+            if isinstance(mrg, dict):
+                for o in (mrg.get("RuleActionOverrides") or []):
+                    if not isinstance(o, dict):
+                        continue
+                    name = o.get("Name") or ""
+                    action_to_use = o.get("ActionToUse") or {}
+                    if isinstance(action_to_use, dict) and action_to_use:
+                        # ActionToUse is shaped like {"Count": {}} / {"Block": {}} / etc.
+                        action_label = next(iter(action_to_use.keys()), "")
+                        if name and action_label:
+                            sub_overrides.append({"name": name, "action": action_label})
         rules.append(
             {
                 "rule_name": r["Name"],
@@ -195,6 +211,7 @@ def get_web_acl_rules(
                 "rule_kind": kind,
                 "statement_json": statement,
                 "override_action": override_action,
+                "managed_rule_overrides": sub_overrides,
                 "fms_managed": bool(r.get("ManagedByFirewallManager", False)),
             }
         )

@@ -6,10 +6,16 @@ const TYPE_STYLES = {
   dead_rule: "bg-red-50 text-red-800 border-red-200",
   bypass_candidate: "bg-orange-50 text-orange-800 border-orange-200",
   conflict: "bg-purple-50 text-purple-800 border-purple-200",
+  rule_conflict: "bg-purple-50 text-purple-800 border-purple-200",
   quick_win: "bg-green-50 text-green-800 border-green-200",
+  stranded_rule: "bg-amber-50 text-amber-800 border-amber-200",
   // FMS pill is ALWAYS blue, regardless of severity.
   fms_review: "bg-blue-600 text-white border-blue-700",
   orphaned_web_acl: "bg-amber-50 text-amber-800 border-amber-200",
+  count_mode_with_hits: "bg-sky-50 text-sky-800 border-sky-200",
+  count_mode_high_volume: "bg-sky-100 text-sky-900 border-sky-300",
+  count_mode_long_duration: "bg-sky-50 text-sky-700 border-sky-200",
+  managed_rule_override_count: "bg-indigo-50 text-indigo-800 border-indigo-200",
 };
 
 const SEVERITY_STYLES = {
@@ -163,10 +169,10 @@ export default function Results({ auditId, onGoConnect }) {
   return (
     <div className="space-y-8">
       <ResultsHeader auditId={auditId} run={run} />
-      <SummaryBar
+      <HeadlinePanel
         run={run}
         rulesCount={rules?.length || 0}
-        findingsCount={findings?.length || 0}
+        findings={findings || []}
         zeroHit={zeroHit}
         maxSeverity={maxSeverity}
         severityFilter={severityFilter}
@@ -237,7 +243,16 @@ function ResultsHeader({ auditId, run }) {
   );
 }
 
-function SummaryBar({ run, rulesCount, findingsCount, zeroHit, maxSeverity, severityFilter, setSeverityFilter }) {
+function HeadlinePanel({ run, rulesCount, findings, zeroHit, maxSeverity, severityFilter, setSeverityFilter }) {
+  const findingsCount = findings.length;
+  const sev = { high: 0, medium: 0, low: 0 };
+  let bypassCount = 0;
+  let strandedCount = 0;
+  for (const f of findings) {
+    if (sev[f.severity] !== undefined) sev[f.severity]++;
+    if (f.type === "bypass_candidate") bypassCount++;
+    if (f.evidence === "stranded" || f.type === "stranded_rule") strandedCount++;
+  }
   const findingsTone =
     findingsCount === 0
       ? "text-slate-500"
@@ -251,45 +266,78 @@ function SummaryBar({ run, rulesCount, findingsCount, zeroHit, maxSeverity, seve
     run.data_source === "aws"
       ? "bg-emerald-100 text-emerald-800 border-emerald-200"
       : "bg-slate-100 text-slate-700 border-slate-200";
-
   return (
-    <div data-testid="summary-bar" className="grid grid-cols-2 md:grid-cols-5 gap-3">
-      <Stat label="Rules analyzed" value={rulesCount} />
-      <button
-        type="button"
-        onClick={() => setSeverityFilter((s) => (s ? null : maxSeverity))}
-        data-testid="findings-tile"
-        className="rounded-xl border border-slate-200 bg-white p-4 text-left hover:border-slate-300 transition"
-      >
-        <div className="text-xs uppercase tracking-wide text-slate-500">
-          Findings {severityFilter ? `(filtered: ${severityFilter})` : ""}
+    <div data-testid="headline-panel" className="space-y-3">
+      <div className="rounded-xl border border-slate-200 bg-white p-6">
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-500">
+              Audit findings
+            </div>
+            <button
+              type="button"
+              onClick={() => setSeverityFilter((s) => (s ? null : maxSeverity))}
+              data-testid="findings-tile"
+              className="text-left"
+            >
+              <div className={`text-5xl font-bold mt-1 ${findingsTone}`}>
+                {findingsCount}
+              </div>
+            </button>
+            <div className="mt-2 text-sm text-slate-700">
+              <span data-testid="sev-high" className="font-semibold text-red-600">
+                {sev.high} high
+              </span>
+              {"  ·  "}
+              <span data-testid="sev-medium" className="font-semibold text-amber-600">
+                {sev.medium} medium
+              </span>
+              {"  ·  "}
+              <span data-testid="sev-low" className="font-semibold text-slate-500">
+                {sev.low} low
+              </span>
+            </div>
+            {bypassCount > 0 && (
+              <p
+                data-testid="security-lead"
+                className="mt-3 text-sm font-medium text-red-700"
+              >
+                Including {bypassCount} potential security gap
+                {bypassCount === 1 ? "" : "s"} where attack-shaped traffic
+                reached the origin.
+              </p>
+            )}
+            {strandedCount > 0 && (
+              <p className="mt-1 text-sm text-amber-700">
+                {strandedCount} stranded rule{strandedCount === 1 ? "" : "s"} protecting nothing.
+              </p>
+            )}
+            {severityFilter && (
+              <p className="mt-2 text-xs text-slate-500">
+                Filtered to <b>{severityFilter}</b> severity. Click the number to clear.
+              </p>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-2 text-right">
+            <span
+              data-testid="data-source-badge"
+              className={`inline-block rounded-md border px-2 py-1 text-xs font-medium ${dataSourceTone}`}
+            >
+              {dataSource}
+            </span>
+            <div className="text-xs text-slate-500">
+              <div>{rulesCount} rules analyzed</div>
+              <div className="mt-1">{zeroHit} with zero hits</div>
+              <div
+                data-testid="cost-line"
+                className="mt-2 text-[11px] text-slate-400"
+              >
+                Cost optimization: $
+                {(run.estimated_waste_usd ?? 0).toFixed(2)}/mo
+              </div>
+            </div>
+          </div>
         </div>
-        <div className={`text-3xl font-semibold ${findingsTone}`}>{findingsCount}</div>
-      </button>
-      <Stat
-        label="Zero-hit rules"
-        value={zeroHit}
-        valueClass={zeroHit > 0 ? "text-red-600" : ""}
-      />
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="text-xs uppercase tracking-wide text-slate-500">
-          Estimated waste
-        </div>
-        <div className="text-3xl font-semibold text-slate-900">
-          ${(run.estimated_waste_usd ?? 0).toFixed(2)}
-          <span className="text-sm font-normal text-slate-500">/mo</span>
-        </div>
-      </div>
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="text-xs uppercase tracking-wide text-slate-500">
-          Data source
-        </div>
-        <span
-          data-testid="data-source-badge"
-          className={`mt-2 inline-block rounded-md border px-2 py-1 text-xs font-medium ${dataSourceTone}`}
-        >
-          {dataSource}
-        </span>
       </div>
     </div>
   );
@@ -333,6 +381,8 @@ function FindingCard({ f }) {
   const sev = SEVERITY_STYLES[f.severity] || SEVERITY_STYLES.low;
   const typePill = TYPE_STYLES[f.type] || "bg-slate-100 text-slate-700 border-slate-200";
   const isFms = f.type === "fms_review";
+  const [showRem, setShowRem] = useState(f.severity === "high");
+  const remediation = f.remediation;
   return (
     <article
       data-testid="finding-card"
@@ -355,7 +405,7 @@ function FindingCard({ f }) {
           data-testid="type-pill"
           className={`rounded-full border px-2 py-0.5 text-xs font-medium ${typePill}`}
         >
-          {f.type.replace("_", " ")}
+          {f.type.replace(/_/g, " ")}
         </span>
       </div>
       <h3 className="mt-3 text-base font-semibold text-slate-900">{f.title}</h3>
@@ -379,6 +429,55 @@ function FindingCard({ f }) {
         <p className="mt-3 text-xs text-blue-700">
           Controlled by your central security admin via Firewall Manager — cannot be modified here.
         </p>
+      )}
+      {remediation && (
+        <div
+          data-testid="remediation-block"
+          className={`mt-4 rounded-lg border-l-4 bg-slate-50 ${
+            f.severity === "high"
+              ? "border-red-500"
+              : f.severity === "medium"
+                ? "border-amber-500"
+                : "border-slate-400"
+          }`}
+        >
+          <button
+            type="button"
+            data-testid="remediation-toggle"
+            onClick={() => setShowRem((v) => !v)}
+            className="flex w-full items-center justify-between px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100"
+            aria-expanded={showRem}
+          >
+            <span>Remediation</span>
+            <span className="text-xs text-slate-500">{showRem ? "Hide" : "Show"}</span>
+          </button>
+          {showRem && (
+            <div className="space-y-3 px-4 pb-4 text-sm text-slate-700">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Suggested actions
+                </div>
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  {(remediation.suggested_actions || []).map((a, i) => (
+                    <li key={i}>{a}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Verify by
+                </div>
+                <p className="mt-1">{remediation.verify_by}</p>
+              </div>
+              <p
+                data-testid="remediation-disclaimer"
+                className="text-[11px] italic leading-snug text-slate-500"
+              >
+                {remediation.disclaimer}
+              </p>
+            </div>
+          )}
+        </div>
       )}
     </article>
   );
@@ -426,6 +525,19 @@ function RuleBrowser({ rules, flaggedMap }) {
                             Flagged
                           </span>
                         )}
+                        {Array.isArray(r.managed_rule_overrides) &&
+                          r.managed_rule_overrides.length > 0 && (
+                            <span
+                              data-testid="override-badge"
+                              title={r.managed_rule_overrides
+                                .map((o) => `${o.name}: ${o.action}`)
+                                .join("\n")}
+                              className="rounded bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700"
+                            >
+                              {r.managed_rule_overrides.length} override
+                              {r.managed_rule_overrides.length === 1 ? "" : "s"}
+                            </span>
+                          )}
                       </div>
                       {flag ? (
                         <p className="mt-1 text-[11px] text-slate-600 italic">

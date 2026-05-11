@@ -34,6 +34,7 @@ from pymongo.database import Database
 
 from . import ai_pipeline
 from . import aws_waf
+from . import remediation as remediation_mod
 from . import scoring
 
 logger = logging.getLogger(__name__)
@@ -507,6 +508,157 @@ def _apply_phase5_finding_guardrails(
     return out
 
 
+# Phase 5.3 — deterministic scorer passes (no AI variance) ------------------
+
+
+_COUNT_MODE_LABELS = {"COUNT", "Count (override)"}
+_COUNT_HIGH_VOLUME_THRESHOLD = 3000      # > 3,000/30d → high-volume
+_COUNT_LONG_DURATION_HITS = 100          # ≥ 100 hits → long-running proxy
+
+
+def _is_count_mode(rule: Dict[str, Any]) -> bool:
+    """True iff the rule is operating in COUNT (observe-only) mode.
+
+    Covers both kinds of COUNT we render:
+      * custom rule with Action.Count        → `action == "COUNT"`
+      * managed group with OverrideAction.Count → `action == "Count (override)"`
+    """
+    if rule.get("override_action") == "Count":
+        return True
+    action = rule.get("action") or ""
+    return action in _COUNT_MODE_LABELS
+
+
+def _count_mode_findings(
+    rules: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Phase 5.3.2 — deterministic scoring of COUNT-mode rule rot.
+
+    Emits up to three finding types per qualifying rule:
+
+      * `count_mode_with_hits`     (MEDIUM): COUNT + hit_count > 0
+      * `count_mode_high_volume`   (HIGH):   COUNT + hit_count > 3,000 in 30d
+      * `count_mode_long_duration` (LOW):    COUNT + ≥ 100 hits sustained
+                                              (proxy for "rule appears
+                                              forgotten in COUNT for long")
+
+    `with_hits` always emits when applicable (it's the baseline). The
+    other two are *additional* signal layers that ride on top of
+    `with_hits` — they are NOT a strict supersedure tree.
+    """
+    out: List[Dict[str, Any]] = []
+    for r in rules:
+        if not _is_count_mode(r):
+            continue
+        hits = int(r.get("hit_count") or 0)
+        if hits <= 0:
+            continue
+        rule_name = r.get("rule_name") or ""
+        acl_name = r.get("web_acl_name") or ""
+        # Baseline
+        out.append({
+            "type": "count_mode_with_hits",
+            "severity": "medium",
+            "affected_rules": [rule_name],
+            "title": f"COUNT-mode rule '{rule_name}' is matching traffic",
+            "description": (
+                f"Rule '{rule_name}' on ACL '{acl_name}' is in COUNT mode "
+                f"and matched {hits:,} requests in the last 30 days. "
+                f"COUNT records matches without blocking — promotion to "
+                f"BLOCK should be considered when the rule is mature."
+            ),
+            "recommendation": (
+                "Sample the COUNT hits; if they all match the intended "
+                "signature, promote to BLOCK."
+            ),
+            "confidence": 0.85,
+            "evidence": "count_mode",
+        })
+        if hits > _COUNT_HIGH_VOLUME_THRESHOLD:
+            out.append({
+                "type": "count_mode_high_volume",
+                "severity": "high",
+                "affected_rules": [rule_name],
+                "title": f"High-volume COUNT rule '{rule_name}' worth promoting",
+                "description": (
+                    f"Rule '{rule_name}' has accumulated {hits:,} COUNT hits "
+                    f"in 30 days on ACL '{acl_name}'. Sustained volume at "
+                    f"this level is a strong indicator the rule is mature "
+                    f"and the COUNT state is no longer providing additional "
+                    f"signal."
+                ),
+                "recommendation": (
+                    "Schedule a maintenance window to promote this rule "
+                    "from COUNT to BLOCK. Snapshot a 200-event sample for "
+                    "FP review first."
+                ),
+                "confidence": 0.92,
+                "evidence": "count_mode_high_volume",
+            })
+        elif hits >= _COUNT_LONG_DURATION_HITS:
+            out.append({
+                "type": "count_mode_long_duration",
+                "severity": "low",
+                "affected_rules": [rule_name],
+                "title": f"Long-running COUNT rule '{rule_name}' (≥ 100 sustained hits)",
+                "description": (
+                    f"Rule '{rule_name}' has accumulated {hits:,} COUNT "
+                    f"hits, suggesting the COUNT state has been in place "
+                    f"long enough for the rule to be evaluated for "
+                    f"promotion. Without `rule.created_at`, RuleIQ uses "
+                    f"sustained hit volume as a proxy for duration."
+                ),
+                "recommendation": (
+                    "Re-confirm intent with the rule's owning team and "
+                    "promote if no current rationale exists for COUNT."
+                ),
+                "confidence": 0.65,
+                "evidence": "count_mode_long_duration",
+            })
+    return out
+
+
+def _managed_override_findings(
+    rules: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Phase 5.3.3 — surface sub-rule COUNT overrides inside managed groups.
+
+    These are often forgotten — e.g. `SizeRestrictions_BODY → Count` was
+    added years ago for a specific upload endpoint that's since been
+    decommissioned. One LOW finding per (group, override-pair).
+    """
+    out: List[Dict[str, Any]] = []
+    for r in rules:
+        overrides = r.get("managed_rule_overrides") or []
+        for o in overrides:
+            sub_name = o.get("name") or ""
+            sub_action = o.get("action") or ""
+            if sub_action != "Count":
+                continue
+            group = r.get("rule_name") or ""
+            out.append({
+                "type": "managed_rule_override_count",
+                "severity": "low",
+                "affected_rules": [group],
+                "title": (
+                    f"Sub-rule '{sub_name}' in '{group}' overridden to COUNT"
+                ),
+                "description": (
+                    f"The managed rule group '{group}' has sub-rule "
+                    f"'{sub_name}' overridden to COUNT instead of the "
+                    f"group's default BLOCK action. Review whether this "
+                    f"override is still intentional."
+                ),
+                "recommendation": (
+                    "If no current rationale exists, remove the override "
+                    "so the managed group's default action applies."
+                ),
+                "confidence": 0.7,
+                "evidence": "managed_override",
+            })
+    return out
+
+
 def _orphaned_acl_findings(
     web_acl_summaries: List[Dict[str, Any]],
     rules_by_acl: Dict[str, List[Dict[str, Any]]],
@@ -637,6 +789,7 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                 "sample_uris": r.get("sample_uris", []),
                 "fms_managed": r.get("fms_managed", False),
                 "override_action": r.get("override_action"),
+                "managed_rule_overrides": r.get("managed_rule_overrides") or [],
                 "rule_kind": rule_kind,
                 "ai_explanation": ai.get("explanation"),
                 "ai_working": ai.get("working"),
@@ -658,7 +811,12 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
             guarded, rules_by_name, rules_by_acl, web_acl_summaries
         )
         orphan_findings = _orphaned_acl_findings(web_acl_summaries, rules_by_acl)
-        final_findings = guarded + orphan_findings
+        # Phase 5.3 — deterministic COUNT-mode + managed-override scorers.
+        count_findings = _count_mode_findings(rule_docs)
+        override_findings = _managed_override_findings(rule_docs)
+        final_findings = (
+            guarded + orphan_findings + count_findings + override_findings
+        )
 
         finding_docs: List[Dict[str, Any]] = []
         for f in final_findings:
@@ -668,6 +826,10 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                 affected_rules=f.get("affected_rules", []),
                 total_rule_count=total,
             )
+            # Phase 5.3.1 — canned remediation lookup. Attached on the
+            # finding doc so both the PDF renderer and the API serializer
+            # carry the same content.
+            remediation = remediation_mod.remediation_for(f, rules_by_name)
             finding_docs.append(
                 {
                     "audit_run_id": audit_run_id,
@@ -680,6 +842,7 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                     "confidence": float(f.get("confidence", 0.0)),
                     "severity_score": score,
                     "evidence": f.get("evidence"),
+                    "remediation": remediation,
                     "created_at": _utcnow(),
                 }
             )
