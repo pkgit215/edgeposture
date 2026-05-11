@@ -45,13 +45,14 @@ SEV_LOW = colors.HexColor("#6b7280")    # gray-500
 
 SEV_COLOR = {"high": SEV_HIGH, "medium": SEV_MED, "low": SEV_LOW}
 
-TYPE_ORDER = ["dead_rule", "bypass_candidate", "conflict", "quick_win", "fms_review"]
+TYPE_ORDER = ["dead_rule", "bypass_candidate", "conflict", "quick_win", "fms_review", "orphaned_web_acl"]
 TYPE_LABEL = {
     "dead_rule": "Dead rules",
     "bypass_candidate": "Bypass candidates",
     "conflict": "Rule conflicts",
     "quick_win": "Quick wins",
     "fms_review": "FMS-managed review items",
+    "orphaned_web_acl": "Orphaned Web ACLs",
 }
 
 
@@ -477,6 +478,89 @@ def _fmt_last_fired(value: Any) -> str:
         return s
 
 
+def _build_web_acl_section(audit_run: Dict[str, Any],
+                           S: Dict[str, ParagraphStyle]) -> List[Flowable]:
+    """Phase 5 — render the Web ACL attachment table.
+
+    Empty / missing `web_acls` ⇒ nothing emitted (e.g. older audit runs).
+    """
+    web_acls = audit_run.get("web_acls") or []
+    if not web_acls:
+        return []
+    out: List[Flowable] = []
+    out.append(Paragraph("Web ACL Attachment", S["h2"]))
+    out.append(Paragraph(
+        "Web ACLs scanned in this audit. Orphaned ACLs (no attached "
+        "resources) protect nothing and incur the fixed monthly fee.",
+        S["muted"],
+    ))
+    out.append(Spacer(1, 6))
+
+    cell = ParagraphStyle(
+        "wacl_cell", parent=S["body_small"], fontSize=9, leading=11,
+        textColor=INK_SOFT, fontName="Helvetica",
+    )
+    cell_bold = ParagraphStyle(
+        "wacl_cell_b", parent=cell, fontName="Helvetica-Bold", textColor=INK,
+    )
+    cell_orphan = ParagraphStyle(
+        "wacl_cell_o", parent=cell_bold, textColor=SEV_HIGH,
+    )
+    header_style = ParagraphStyle(
+        "wacl_header", parent=cell, fontName="Helvetica-Bold",
+        textColor=colors.white, fontSize=9,
+    )
+
+    rows: List[List[Any]] = [[
+        Paragraph("Web ACL", header_style),
+        Paragraph("Scope", header_style),
+        Paragraph("Attached Resources", header_style),
+        Paragraph("Status", header_style),
+    ]]
+    orphan_idx: List[int] = []
+    for i, acl in enumerate(web_acls, start=1):
+        attached = bool(acl.get("attached"))
+        resources = acl.get("attached_resources") or []
+        if attached:
+            status_para = Paragraph("Attached", cell_bold)
+            resource_text = _fmt_int(len(resources)) + " resource(s)"
+        else:
+            orphan_idx.append(i)
+            status_para = Paragraph("ORPHANED", cell_orphan)
+            resource_text = "none"
+        rows.append([
+            Paragraph(str(acl.get("name") or "—"), cell_bold),
+            Paragraph(str(acl.get("scope") or "REGIONAL"), cell),
+            Paragraph(resource_text, cell),
+            status_para,
+        ])
+
+    table = Table(
+        rows,
+        colWidths=[2.7 * inch, 1.0 * inch, 2.1 * inch, 1.7 * inch],
+        repeatRows=1,
+    )
+    style_cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), INK),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 7),
+        ("TOPPADDING", (0, 0), (-1, 0), 7),
+        ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.3, HAIRLINE),
+        ("BOX", (0, 0), (-1, -1), 0.4, HAIRLINE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 1), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 5),
+    ]
+    for i in orphan_idx:
+        style_cmds.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#fef2f2")))
+    table.setStyle(TableStyle(style_cmds))
+    out.append(table)
+    out.append(Spacer(1, 16))
+    return out
+
+
 def _build_inventory_table(rules: Sequence[Dict[str, Any]],
                             S: Dict[str, ParagraphStyle]) -> List[Flowable]:
     out: List[Flowable] = []
@@ -610,6 +694,148 @@ def _build_inventory_table(rules: Sequence[Dict[str, Any]],
 # ---- Public entry point ------------------------------------------------------
 
 
+def _build_observed_gaps_section(audit_run: Dict[str, Any],
+                                  findings: Sequence[Dict[str, Any]],
+                                  S: Dict[str, ParagraphStyle]) -> List[Flowable]:
+    """Phase 5.5 — surface the audit-time evidence sample.
+
+    Pulls `suspicious_request_sample` off the audit run and renders the
+    top-N attack-shaped ALLOW requests that reached the origin during the
+    audit window. This is the *evidence* that drove every
+    `bypass_candidate` finding tagged `evidence='log-sample'` — having it
+    in the PDF gives the reviewer a one-glance answer to "why does the AI
+    think a bypass happened?"
+
+    Empty sample (no real-traffic audit, or no events scored above
+    threshold) ⇒ section omitted entirely.
+    """
+    sample = audit_run.get("suspicious_request_sample") or []
+    bypass_findings = [
+        f for f in findings if f.get("type") == "bypass_candidate"
+    ]
+    if not sample and not bypass_findings:
+        return []
+    out: List[Flowable] = []
+    out.append(Paragraph("Observed WAF Gaps", S["h2"]))
+    out.append(Paragraph(
+        "Attack-shaped requests that reached the origin (action=ALLOW, "
+        "response 2xx/3xx) during the audit window. Each row is the "
+        "primary evidence behind a 'bypass candidate' finding.",
+        S["muted"],
+    ))
+    out.append(Spacer(1, 6))
+
+    if not sample:
+        out.append(Paragraph(
+            "No suspicious-allow samples observed. Bypass findings below were "
+            "produced from rule statistics alone (no log-sample evidence).",
+            S["muted"],
+        ))
+        out.append(Spacer(1, 12))
+        return out
+
+    cell = ParagraphStyle(
+        "gap_cell", parent=S["body_small"], fontSize=8, leading=10,
+        textColor=INK_SOFT, fontName="Helvetica",
+    )
+    cell_mono = ParagraphStyle(
+        "gap_mono", parent=cell, fontName="Courier", fontSize=7.5,
+        textColor=INK,
+    )
+    cell_score = ParagraphStyle(
+        "gap_score", parent=cell, fontName="Helvetica-Bold",
+        textColor=SEV_HIGH,
+    )
+    header_style = ParagraphStyle(
+        "gap_header", parent=cell, fontName="Helvetica-Bold",
+        textColor=colors.white, fontSize=8,
+    )
+
+    rows: List[List[Any]] = [[
+        Paragraph("Score", header_style),
+        Paragraph("URI", header_style),
+        Paragraph("Signature", header_style),
+        Paragraph("User-Agent", header_style),
+    ]]
+    # Show top 10 (already sorted by score desc).
+    for ev in sample[:10]:
+        http = ev.get("httpRequest") or {}
+        uri = (http.get("uri") or "")[:80]
+        args = (http.get("args") or "").lower()
+        headers = http.get("headers") or []
+        ua = ""
+        header_text_blob = ""
+        for h in headers:
+            v = (h.get("value") or "")
+            if (h.get("name") or "").lower() == "user-agent":
+                ua = v[:60]
+            header_text_blob += " " + v.lower()
+        signature = _classify_signature(uri.lower(), args, header_text_blob)
+        rows.append([
+            Paragraph(str(ev.get("_suspicion_score") or 0), cell_score),
+            Paragraph(uri or "—", cell_mono),
+            Paragraph(signature, cell),
+            Paragraph(ua or "—", cell_mono),
+        ])
+
+    table = Table(
+        rows,
+        colWidths=[0.55 * inch, 2.85 * inch, 1.45 * inch, 2.65 * inch],
+        repeatRows=1,
+    )
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), INK),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
+        ("TOPPADDING", (0, 0), (-1, 0), 6),
+        ("FONTSIZE", (0, 1), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.3, HAIRLINE),
+        ("BOX", (0, 0), (-1, -1), 0.4, HAIRLINE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 1), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#fff7ed")),
+    ]))
+    out.append(table)
+    if len(sample) > 10:
+        out.append(Spacer(1, 4))
+        out.append(Paragraph(
+            f"+{len(sample) - 10} additional sampled requests not shown "
+            "(retained on the audit document for review).",
+            S["muted"],
+        ))
+    out.append(Spacer(1, 16))
+    return out
+
+
+def _classify_signature(uri: str, args: str, header_blob: str) -> str:
+    """One-line attack-class label for the PDF gap table."""
+    if "() { :;}" in header_blob or "() {:;}" in header_blob:
+        return "Shellshock"
+    if "${jndi:" in header_blob or "${jndi:" in uri or "${jndi:" in args:
+        return "Log4Shell / JNDI"
+    if any(t in (uri + " " + args) for t in (
+        "union+select", "union select", "' or '1'='1", "'; drop table"
+    )):
+        return "SQL Injection"
+    if any(t in (uri + " " + args) for t in (
+        "<script", "javascript:", "onerror=", "onload=",
+    )):
+        return "XSS"
+    if any(t in uri for t in ("../", "..\\", "/etc/passwd", "/proc/self")):
+        return "Path Traversal / LFI"
+    if any(t in (uri + " " + args) for t in (
+        "wget ", "curl ", "bash -c", "eval(", "system(",
+    )):
+        return "Command Injection"
+    if any(uri.startswith(p) for p in (
+        "/admin", "/.git", "/.env", "/wp-admin", "/cgi-bin/", "/phpmyadmin"
+    )):
+        return "Sensitive Path"
+    return "Scanner / Recon"
+
+
 def render_audit_pdf(
     audit_run: Dict[str, Any],
     rules: Sequence[Dict[str, Any]],
@@ -651,7 +877,9 @@ def render_audit_pdf(
     story: List[Flowable] = []
     story += _build_cover(audit_run, stats, generated_at, S)
     story += _build_executive_summary(audit_run, findings, stats, S)
+    story += _build_observed_gaps_section(audit_run, findings, S)
     story += _build_findings_detail(rules, findings, S)
+    story += _build_web_acl_section(audit_run, S)
     story += _build_inventory_table(rules, S)
 
     doc.build(story)

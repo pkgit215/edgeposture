@@ -9,6 +9,7 @@ const TYPE_STYLES = {
   quick_win: "bg-green-50 text-green-800 border-green-200",
   // FMS pill is ALWAYS blue, regardless of severity.
   fms_review: "bg-blue-600 text-white border-blue-700",
+  orphaned_web_acl: "bg-amber-50 text-amber-800 border-amber-200",
 };
 
 const SEVERITY_STYLES = {
@@ -173,6 +174,8 @@ export default function Results({ auditId, onGoConnect }) {
       />
 
       <FindingsList findings={visibleFindings || []} />
+
+      <WebACLPanel webAcls={run.web_acls || []} />
 
       <RuleBrowser rules={rules || []} flaggedMap={findingNamesByType} />
 
@@ -525,6 +528,78 @@ function WasteBreakdown({ breakdown, total }) {
               <td className="px-4 py-3 text-right font-mono">${(total ?? 0).toFixed(2)}</td>
               <td />
             </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function WebACLPanel({ webAcls }) {
+  if (!webAcls || webAcls.length === 0) return null;
+  const orphanCount = webAcls.filter((a) => !a.attached).length;
+  return (
+    <section data-testid="web-acl-panel">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-slate-900">Web ACL Attachment</h2>
+        {orphanCount > 0 && (
+          <span
+            data-testid="orphan-count"
+            className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-800"
+          >
+            {orphanCount} orphaned
+          </span>
+        )}
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+        <table className="min-w-full text-sm">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-4 py-3 text-left">Web ACL</th>
+              <th className="px-4 py-3 text-left">Scope</th>
+              <th className="px-4 py-3 text-left">Attached resources</th>
+              <th className="px-4 py-3 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {webAcls.map((a, i) => {
+              const attached = !!a.attached;
+              const count = (a.attached_resources || []).length;
+              return (
+                <tr
+                  key={`${a.name}-${i}`}
+                  data-testid="web-acl-row"
+                  data-attached={attached ? "1" : "0"}
+                  className={attached ? "" : "bg-amber-50/40"}
+                >
+                  <td className="px-4 py-3 font-mono text-xs text-slate-800">
+                    {a.name}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">{a.scope || "REGIONAL"}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    {attached ? (
+                      <span>{count} resource{count === 1 ? "" : "s"}</span>
+                    ) : (
+                      <span className="italic text-slate-500">none</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {attached ? (
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        Attached
+                      </span>
+                    ) : (
+                      <span
+                        data-testid="orphan-badge"
+                        className="rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-800"
+                      >
+                        Orphaned
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

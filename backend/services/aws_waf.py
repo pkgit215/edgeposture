@@ -14,6 +14,7 @@ Sampling policy for get_rule_stats:
 from __future__ import annotations
 
 import base64
+import heapq
 import json
 import logging
 import time
@@ -138,7 +139,9 @@ def get_web_acl_rules(
     acl = resp["WebACL"]
     rules: List[Dict[str, Any]] = []
     for r in acl.get("Rules", []):
-        action = _derive_action(r)
+        statement = _normalize_for_json(r.get("Statement", {}))
+        kind = classify_rule_kind(statement)
+        mode = derive_mode(r, kind)
         override_action = None
         ovr = r.get("OverrideAction") or {}
         if "None" in ovr:
@@ -149,8 +152,9 @@ def get_web_acl_rules(
             {
                 "rule_name": r["Name"],
                 "priority": r.get("Priority", 0),
-                "action": action,
-                "statement_json": _normalize_for_json(r.get("Statement", {})),
+                "action": mode,  # Phase 5: now uses derive_mode() — "Block (group)" etc.
+                "rule_kind": kind,
+                "statement_json": statement,
                 "override_action": override_action,
                 "fms_managed": bool(r.get("ManagedByFirewallManager", False)),
             }
@@ -158,16 +162,306 @@ def get_web_acl_rules(
     return rules
 
 
-def _derive_action(rule: Dict[str, Any]) -> str:
+def classify_rule_kind(statement: Dict[str, Any]) -> str:
+    """Phase 5: 'managed' vs 'rate_based' vs 'custom'."""
+    if not isinstance(statement, dict):
+        return "custom"
+    if "ManagedRuleGroupStatement" in statement:
+        return "managed"
+    if "RateBasedStatement" in statement:
+        return "rate_based"
+    # Walk one level into AndStatement/OrStatement/NotStatement
+    for combinator in ("AndStatement", "OrStatement", "NotStatement"):
+        inner = statement.get(combinator) or {}
+        stmts = inner.get("Statements") or ([inner.get("Statement")] if inner.get("Statement") else [])
+        for s in stmts:
+            if isinstance(s, dict) and "ManagedRuleGroupStatement" in s:
+                return "managed"
+            if isinstance(s, dict) and "RateBasedStatement" in s:
+                return "rate_based"
+    return "custom"
+
+
+def derive_mode(rule: Dict[str, Any], kind: str) -> str:
+    """Phase 5: human-readable rule action, fixing the OverrideAction misread.
+
+    For managed rule groups:
+      OverrideAction.None  → 'Block (group)'      (group's own per-sub-rule actions apply)
+      OverrideAction.Count → 'Count (override)'   (operator override — observe only)
+      (missing)            → 'Block (group)'      (group default)
+
+    For custom rules:
+      Action.Block/Allow/Count/Captcha/Challenge → upper-case label
+    """
+    if kind == "managed":
+        ovr = rule.get("OverrideAction") or {}
+        if "Count" in ovr:
+            return "Count (override)"
+        return "Block (group)"
     action = rule.get("Action") or {}
-    for key in ("Allow", "Block", "Count", "Captcha", "Challenge"):
+    for key in ("Block", "Allow", "Count", "Captcha", "Challenge"):
         if key in action:
             return key.upper()
-    # Managed/override-only rule
-    ovr = rule.get("OverrideAction") or {}
-    if "Count" in ovr:
-        return "COUNT"
     return "ALLOW"
+
+
+# Compatibility shim — old callers (tests) used _derive_action(rule).
+def _derive_action(rule: Dict[str, Any]) -> str:
+    kind = classify_rule_kind(rule.get("Statement") or {})
+    return derive_mode(rule, kind)
+
+
+def list_resources_for_web_acl(
+    session: boto3.Session, web_acl: Dict[str, Any]
+) -> List[str]:
+    """Phase 5: Return all resource ARNs (ALB, API Gateway, AppSync, etc.) the
+    Web ACL is associated with. For CLOUDFRONT scope, returns distribution
+    IDs (which AWS treats as resources here). Empty list = orphaned ACL.
+
+    All boto3/moto errors degrade gracefully to an empty list rather than
+    failing the audit — older test rigs (moto) don't implement this API.
+    """
+    scope = web_acl.get("Scope", "REGIONAL")
+    arns: List[str] = []
+    region = "us-east-1" if scope == "CLOUDFRONT" else web_acl.get("Region", DEFAULT_REGION)
+    client = session.client("wafv2", region_name=region)
+    if scope == "CLOUDFRONT":
+        try:
+            resp = client.list_resources_for_web_acl(WebACLArn=web_acl["ARN"])
+            for r in resp.get("ResourceArns", []) or []:
+                arns.append(r)
+        except (ClientError, NotImplementedError, Exception) as exc:  # noqa: BLE001
+            logger.warning("list_resources_for_web_acl CLOUDFRONT failed: %s", exc)
+        return arns
+
+    # REGIONAL — iterate the documented resource types.
+    for rt in (
+        "APPLICATION_LOAD_BALANCER",
+        "API_GATEWAY",
+        "APPSYNC",
+        "COGNITO_USER_POOL",
+        "APP_RUNNER_SERVICE",
+        "VERIFIED_ACCESS_INSTANCE",
+    ):
+        try:
+            resp = client.list_resources_for_web_acl(
+                WebACLArn=web_acl["ARN"], ResourceType=rt
+            )
+            for r in resp.get("ResourceArns", []) or []:
+                arns.append(r)
+        except (ClientError, NotImplementedError, Exception) as exc:  # noqa: BLE001
+            # Older SDKs / unsupported resource types / moto stubs.
+            logger.debug("list_resources_for_web_acl %s skipped: %s", rt, exc)
+    return arns
+
+
+# Phase 5.5 — bypass-detection scoring + sampler ----------------------------
+#
+# Scoring is additive across signature families. Threshold of 4 means at
+# least one "scanner / admin path" hit, and we keep top-K (default 50)
+# across the whole audit. Values come straight from the Phase 5 spec —
+# don't lower them without also updating the threshold in the sampler.
+
+_SHELLSHOCK_TOKENS = ("() { :;}", "() {:;}")
+_LOG4SHELL_TOKENS = ("${jndi:",)
+_SQLI_TOKENS = (
+    "union+select", "union select", "' or '1'='1", "' or 1=1",
+    "'; drop table", "; drop table", "/*!50000",
+)
+_XSS_TOKENS = (
+    "<script", "javascript:", "onerror=", "onload=", "onfocus=",
+)
+_LFI_TOKENS = ("../", "..\\", "/etc/passwd", "/proc/self", "\\..\\")
+_CMD_INJECTION_TOKENS = (
+    "wget ", "curl ", "bash -c", "eval(", "system(", "$(", "`whoami",
+)
+_ADMIN_PATH_TOKENS = (
+    "/admin", "/.git", "/.env", "/wp-admin", "/cgi-bin/", "/phpmyadmin",
+    "/server-status", "/.well-known/cgi-bin",
+)
+_SCANNER_UA_TOKENS = (
+    "sqlmap", "nikto", "nmap", "acunetix", "burp", "wpscan",
+    "masscan", "gobuster", "dirbuster",
+)
+
+# Score increments (per spec).
+_S_SHELLSHOCK = 10
+_S_LOG4SHELL = 10
+_S_SQLI = 8
+_S_XSS = 6
+_S_LFI = 6
+_S_CMD = 6
+_S_ADMIN = 4
+_S_SCANNER_UA = 4
+
+# Minimum score for an event to be considered a "candidate" worth sampling.
+SUSPICION_THRESHOLD = 4
+
+
+def score_request_suspicion(req: Dict[str, Any]) -> int:
+    """Return an additive 0..N 'attack-shapedness' score for one parsed
+    WAFv2 log event.
+
+    Signatures (see spec § Phase 5.5):
+      * Shellshock in any header value:                +10
+      * ${jndi: anywhere in headers/uri/args:          +10
+      * SQLi tokens in uri or args:                    +8
+      * XSS tokens in uri or args:                     +6
+      * Path-traversal / LFI tokens in uri:            +6  (also +6 if /etc/passwd etc)
+      * Command-injection tokens in uri or args:       +6
+      * Admin / sensitive-path prefix on uri:          +4
+      * Known scanner User-Agent:                      +4
+
+    No upper cap — multi-signature attacks naturally accumulate higher.
+    A score >= SUSPICION_THRESHOLD (4) marks the request as a candidate
+    for inclusion in the Pass-3 bypass sample.
+    """
+    score = 0
+    http = req.get("httpRequest") or {}
+    uri = (http.get("uri") or "").lower()
+    args = (http.get("args") or "").lower()
+    headers = http.get("headers") or []
+
+    # Flatten headers once.
+    header_values = []
+    ua = ""
+    for h in headers:
+        v = (h.get("value") or "").lower()
+        header_values.append(v)
+        if (h.get("name") or "").lower() == "user-agent":
+            ua = v
+
+    # Shellshock — header-only signature, signature itself is unambiguous.
+    for hv in header_values:
+        if any(tok in hv for tok in _SHELLSHOCK_TOKENS):
+            score += _S_SHELLSHOCK
+            break
+
+    # Log4Shell / JNDI — header, uri, or args.
+    haystack_for_jndi = " ".join([uri, args, *header_values])
+    if any(tok in haystack_for_jndi for tok in _LOG4SHELL_TOKENS):
+        score += _S_LOG4SHELL
+
+    # SQLi.
+    haystack_for_payload = uri + " " + args
+    if any(tok in haystack_for_payload for tok in _SQLI_TOKENS):
+        score += _S_SQLI
+
+    # XSS.
+    if any(tok in haystack_for_payload for tok in _XSS_TOKENS):
+        score += _S_XSS
+
+    # LFI / path traversal — primarily uri.
+    if any(tok in uri for tok in _LFI_TOKENS):
+        score += _S_LFI
+
+    # Command injection.
+    if any(tok in haystack_for_payload for tok in _CMD_INJECTION_TOKENS):
+        score += _S_CMD
+
+    # Admin / sensitive paths — uri prefix only.
+    if any(uri.startswith(p) for p in _ADMIN_PATH_TOKENS):
+        score += _S_ADMIN
+
+    # Scanner UA.
+    if ua and any(tok in ua for tok in _SCANNER_UA_TOKENS):
+        score += _S_SCANNER_UA
+
+    return score
+
+
+def sample_suspicious_allowed_requests(
+    session: boto3.Session,
+    log_group_arn: str,
+    days: int = DEFAULT_WINDOW_DAYS,
+    top_k: int = 50,
+    *,
+    logs_client: Any = None,
+    max_events_scanned: int = 200_000,
+) -> List[Dict[str, Any]]:
+    """Phase 5.5 — page CloudWatch Logs for ALLOW events on this Web ACL's
+    log group and return the global top-K by `score_request_suspicion`.
+
+    Only events with `action == "ALLOW"` are considered — these are the
+    requests that REACHED the origin. BLOCK/COUNT events are excluded
+    because they were already handled by a WAF rule (the spec wants
+    coverage gaps, not rule hits).
+
+    Returns a list of parsed-JSON log events sorted by score desc, each
+    annotated with an internal `_suspicion_score` field. Empty input
+    (no logs, or no events scoring above SUSPICION_THRESHOLD) ⇒ [].
+    """
+    region = _region_from_arn(log_group_arn) or DEFAULT_REGION
+    if logs_client is None:
+        logs_client = session.client("logs", region_name=region)
+
+    log_group_name = _log_group_name_from_arn(log_group_arn)
+    now = time.time()
+    start_ms = _ms(now - days * 86400)
+    end_ms = _ms(now)
+    # CloudWatch Logs JSON filter — server-side narrowing to ALLOW so we
+    # don't drag back gigabytes of irrelevant BLOCK events.
+    pattern = '{ $.action = "ALLOW" }'
+
+    heap: List[Any] = []  # (score, tie-breaker, parsed_event)
+    next_token: Optional[str] = None
+    scanned = 0
+    tie = 0
+
+    while scanned < max_events_scanned:
+        kwargs: Dict[str, Any] = {
+            "logGroupName": log_group_name,
+            "startTime": start_ms,
+            "endTime": end_ms,
+            "filterPattern": pattern,
+            "limit": LOG_EVENT_PAGE_SIZE,
+        }
+        if next_token:
+            kwargs["nextToken"] = next_token
+        try:
+            resp = logs_client.filter_log_events(**kwargs)
+        except ClientError as exc:
+            logger.info(
+                "filter_log_events ALLOW sample failed for %s: %s",
+                log_group_name, exc,
+            )
+            break
+        events = resp.get("events", []) or []
+        for ev in events:
+            scanned += 1
+            try:
+                parsed = json.loads(ev.get("message", "{}"))
+            except json.JSONDecodeError:
+                continue
+            if parsed.get("action") != "ALLOW":
+                continue  # defence-in-depth — server filter SHOULD have caught
+            score = score_request_suspicion(parsed)
+            if score < SUSPICION_THRESHOLD:
+                continue
+            tie += 1
+            parsed["_suspicion_score"] = score
+            if len(heap) < top_k:
+                heapq.heappush(heap, (score, tie, parsed))
+            elif score > heap[0][0]:
+                heapq.heappushpop(heap, (score, tie, parsed))
+        next_token = resp.get("nextToken")
+        if not next_token:
+            break
+
+    return [p for _s, _t, p in sorted(heap, key=lambda x: (-x[0], x[1]))]
+
+
+def merge_suspicious_samples(
+    samples: List[List[Dict[str, Any]]], top_k: int = 50
+) -> List[Dict[str, Any]]:
+    """Merge per-ACL suspicious-request samples into one global top-K
+    ranked by `_suspicion_score`. Stable across input order."""
+    flat: List[Dict[str, Any]] = []
+    for s in samples:
+        if s:
+            flat.extend(s)
+    flat.sort(key=lambda e: -int(e.get("_suspicion_score") or 0))
+    return flat[:top_k]
 
 
 # ---------- FMS (best-effort) -------------------------------------------------

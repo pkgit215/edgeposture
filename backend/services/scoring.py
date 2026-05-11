@@ -1,36 +1,56 @@
-"""Deterministic scoring helpers for findings + dollar-waste estimate.
+"""Deterministic scoring helpers — Phase 5: kind-aware severity.
 
-All numbers here are intentionally transparent so a reviewer can audit the
-math without reading code:
+Severity table (per (rule_kind, hit_bucket) pair):
 
-  severity_score (per finding, int 0..100):
-      severity_weight = {"high":1.0, "medium":0.6, "low":0.3}[severity]
-      breadth = min(1.0, len(affected_rules) / max(1, total_rule_count))
-      score   = round(severity_weight * confidence * (0.6 + 0.4 * breadth) * 100)
-      score   = clamp(score, 0, 100)
+  Rule Kind          | Hits=0           | Hits<10/30d  | Hits Healthy
+  -------------------+------------------+--------------+--------------
+  custom             | HIGH (truly dead)| MEDIUM       | LOW
+  managed            | LOW (info)       | LOW          | LOW
+  rate_based         | MEDIUM (gap?)    | LOW          | LOW
 
-  estimated_waste_usd (per audit run, float):
-      AWS WAFv2 us-east-1 public list pricing (snapshot 2026-02; revisit
-      whenever AWS publishes a price change):
-          WEB_ACL_MONTHLY_USD = $5.00
-          RULE_MONTHLY_USD    = $1.00
-          REQUEST_MILLION_USD = $0.60   # not used in Phase 1
-      dead_rule_count = rules with hit_count == 0 AND fms_managed == False
-      waste_usd       = dead_rule_count * RULE_MONTHLY_USD
-
-  estimated_waste_breakdown (per audit run, list[dict]):
-      One entry per dead non-FMS rule:
-          {rule_name, monthly_usd: 1.00, reason}
+Rule kinds are derived in aws_waf.classify_rule_kind() from the rule's
+Statement shape; ingestion stamps `rule_kind` on every Rule document.
 """
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 WEB_ACL_MONTHLY_USD = 5.00
 RULE_MONTHLY_USD = 1.00
-REQUEST_MILLION_USD = 0.60  # reserved for Phase 2
+REQUEST_MILLION_USD = 0.60
 
 SEVERITY_WEIGHT = {"high": 1.0, "medium": 0.6, "low": 0.3}
+
+LOW_HIT_THRESHOLD = 10  # < this many hits in window → "low" bucket
+
+
+def _hit_bucket(hit_count: int) -> str:
+    if hit_count == 0:
+        return "zero"
+    if hit_count < LOW_HIT_THRESHOLD:
+        return "low"
+    return "healthy"
+
+
+def kind_severity(rule_kind: str, hit_count: int) -> Tuple[str, int]:
+    """Return (severity_label, base_score) for a rule given its kind+hits.
+
+    The base_score is the *pre*-breadth/confidence score; finding-level
+    severity_score() multiplies by confidence and breadth as before.
+    """
+    bucket = _hit_bucket(hit_count)
+    table = {
+        ("custom",     "zero"):    ("high",   85),
+        ("custom",     "low"):     ("medium", 55),
+        ("custom",     "healthy"): ("low",    20),
+        ("managed",    "zero"):    ("low",    20),  # was HIGH 63 → noise
+        ("managed",    "low"):     ("low",    20),
+        ("managed",    "healthy"): ("low",    15),
+        ("rate_based", "zero"):    ("medium", 50),
+        ("rate_based", "low"):     ("low",    25),
+        ("rate_based", "healthy"): ("low",    15),
+    }
+    return table.get((rule_kind, bucket), ("low", 20))
 
 
 def severity_score(
@@ -46,12 +66,23 @@ def severity_score(
 
 
 def _is_dead_customer(rule: Dict[str, Any]) -> bool:
-    return (rule.get("hit_count") or 0) == 0 and not rule.get("fms_managed", False)
+    """A 'truly dead' customer rule for waste-USD accounting.
+
+    Managed rule groups with zero hits are NOT waste — they're defensive
+    signature lists that fire only when matching traffic appears. Excluding
+    them is the Phase 5 fix.
+    """
+    if rule.get("fms_managed", False):
+        return False
+    if (rule.get("rule_kind") or "custom") == "managed":
+        return False
+    return (rule.get("hit_count") or 0) == 0
 
 
 def estimated_waste_usd(rules: Iterable[Dict[str, Any]]) -> float:
-    dead_customer = [r for r in rules if _is_dead_customer(r)]
-    return round(len(dead_customer) * RULE_MONTHLY_USD, 2)
+    return round(
+        sum(RULE_MONTHLY_USD for r in rules if _is_dead_customer(r)), 2
+    )
 
 
 def estimated_waste_breakdown(rules: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:

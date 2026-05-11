@@ -1,4 +1,22 @@
-"""Pydantic v2 models for the RuleIQ persistence layer (Phase 2)."""
+"""Pydantic v2 models for the RuleIQ persistence layer.
+
+Phase 5 additions
+-----------------
+* `Rule.rule_kind`        — 'custom' | 'managed' | 'rate_based'. Derived in
+                            `aws_waf.classify_rule_kind()` and used by
+                            `scoring.kind_severity()` so we stop labelling
+                            zero-hit managed defensive rules as HIGH waste.
+* `Finding.evidence`      — provenance tag. 'log-sample' for findings
+                            produced by Pass-3 bypass detection over real
+                            request logs; None for AI-only findings.
+* `WebACLAttachmentInfo`  — per-ACL attachment data fetched via
+                            `wafv2:list-resources-for-web-acl`. An ACL with
+                            zero attached resources is *orphaned*; its
+                            dead-rule findings get suppressed at audit time
+                            and a single `orphaned_web_acl` finding is
+                            emitted instead.
+* `FindingType`           — new value `'orphaned_web_acl'`.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -7,10 +25,16 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 FindingType = Literal[
-    "dead_rule", "bypass_candidate", "conflict", "quick_win", "fms_review"
+    "dead_rule",
+    "bypass_candidate",
+    "conflict",
+    "quick_win",
+    "fms_review",
+    "orphaned_web_acl",
 ]
 Severity = Literal["high", "medium", "low"]
 AuditStatus = Literal["pending", "running", "complete", "failed"]
+RuleKind = Literal["custom", "managed", "rate_based"]
 
 
 def _utcnow() -> datetime:
@@ -34,6 +58,22 @@ class WasteBreakdownEntry(BaseModel):
     reason: str
 
 
+class WebACLAttachmentInfo(BaseModel):
+    """Phase 5 — per-Web-ACL attachment summary.
+
+    `attached_resources` lists the ARNs (ALB/APIGW/AppSync/etc., or
+    CloudFront distribution IDs) the ACL is bound to. Empty list ⇒
+    `attached=False` ⇒ the ACL is orphaned and any "dead rule" findings on
+    it are suppressed (you can't have dead rules on an ACL that protects
+    nothing).
+    """
+    name: str
+    scope: str = "REGIONAL"
+    arn: Optional[str] = None
+    attached_resources: List[str] = Field(default_factory=list)
+    attached: bool = True
+
+
 class AuditRun(_MongoModel):
     id: str = Field(alias="_id")
     account_id: str
@@ -54,6 +94,8 @@ class AuditRun(_MongoModel):
     logging_available: Optional[bool] = None
     data_source: Optional[Literal["aws", "fixture", "pending"]] = None
     seed: bool = False
+    # Phase 5: surfaced Web-ACL-level attachment status.
+    web_acls: Optional[List[WebACLAttachmentInfo]] = None
 
 
 class AuditCreateRequest(BaseModel):
@@ -79,6 +121,8 @@ class Rule(_MongoModel):
     ai_explanation: Optional[str] = None
     ai_working: Optional[bool] = None
     ai_concerns: Optional[str] = None
+    # Phase 5: kind-aware severity & domain-aware recommendations.
+    rule_kind: RuleKind = "custom"
 
 
 class Finding(_MongoModel):
@@ -92,3 +136,5 @@ class Finding(_MongoModel):
     confidence: float
     severity_score: int = 0
     created_at: datetime = Field(default_factory=_utcnow)
+    # Phase 5: provenance tag — 'log-sample' for Pass-3 bypass findings.
+    evidence: Optional[str] = None

@@ -102,7 +102,7 @@ def _startup() -> None:
 def health() -> Dict[str, str]:
     return {
         "status": "ok",
-        "phase": "4.5",
+        "phase": "5",
         "mongo": "ok" if db_mod.ping() else "unreachable",
     }
 
