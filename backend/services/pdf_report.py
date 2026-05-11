@@ -555,7 +555,9 @@ def _render_finding(f: Dict[str, Any], fms_set: set,
     rem_block = _render_remediation_block(
         {"suggested_actions": list(suggested or []),
          "verify_by": verify_by or "",
-         "disclaimer": disclaimer or ""},
+         "disclaimer": disclaimer or "",
+         "remediation_kind": f.get("remediation_kind"),
+         "evidence_samples": f.get("evidence_samples") or []},
         sev, S,
     )
     return KeepTogether([row, Spacer(1, 2), rem_block])
@@ -564,22 +566,47 @@ def _render_finding(f: Dict[str, Any], fms_set: set,
 def _render_remediation_block(
     rem: Dict[str, Any], severity: str, S: Dict[str, ParagraphStyle]
 ) -> Flowable:
-    """Phase 5.3.1 — canned remediation block beneath each finding card."""
+    """Phase 5.3.1 — canned remediation block beneath each finding card.
+
+    Feat #2 — when `remediation_kind == "smart"`, prepend a small
+    🎯 Account-specific badge to the Suggested actions heading. When
+    `evidence_samples` is non-empty, append a monospaced "Example matched
+    requests" block — gives readers the actual URIs that hit origin.
+    """
     actions = rem.get("suggested_actions") or []
     verify = rem.get("verify_by") or ""
     disclaimer = rem.get("disclaimer") or ""
+    kind = rem.get("remediation_kind")
+    samples = rem.get("evidence_samples") or []
 
     actions_html = "<br/>".join(f"• {a}" for a in actions) or "—"
+    suggested_heading = (
+        f"<font color='{MUTED.hexval()}'><b>Suggested actions:</b></font>"
+    )
+    if kind == "smart":
+        suggested_heading += (
+            f" &nbsp;<font color='{ACCENT.hexval()}' size=7>"
+            f"<b>🎯 Account-specific</b></font>"
+        )
     content = [
         Paragraph(
             f"<b>Remediation</b>",
             S["body_small"],
         ),
         Paragraph(
-            f"<font color='{MUTED.hexval()}'><b>Suggested actions:</b></font><br/>"
-            f"{actions_html}",
+            f"{suggested_heading}<br/>{actions_html}",
             S["body_small"],
         ),
+    ]
+    if samples:
+        sample_lines = "<br/>".join(f"&nbsp;&nbsp;- {s}" for s in samples)
+        content.append(Paragraph(
+            f"<font color='{MUTED.hexval()}' size=7>"
+            f"<b>Example matched requests:</b></font><br/>"
+            f"<font face='Courier' size=7>{sample_lines}</font>",
+            S["body_small"],
+        ))
+    content.extend([
         Paragraph(
             f"<font color='{MUTED.hexval()}'><b>Verify by:</b></font> {verify}",
             S["body_small"],
@@ -588,7 +615,7 @@ def _render_remediation_block(
             f"<font color='{MUTED.hexval()}' size=7><i>{disclaimer}</i></font>",
             S["body_small"],
         ),
-    ]
+    ])
     bar = _SeverityBar(severity, height=14 * len(content))
     tbl = Table([[bar, content]], colWidths=[0.12 * inch, 6.0 * inch])
     tbl.setStyle(TableStyle([

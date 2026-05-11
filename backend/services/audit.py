@@ -931,6 +931,23 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
             remediation = remediation_mod.remediation_for(f, rules_by_name)
             # Phase 5.3.2 — Impact copy attached as a sibling field.
             impact = remediation_mod.impact_for(f, rules_by_name)
+            # Feat #2 — Flavor B: account-aware suggested_actions for the
+            # four high-value finding types. None means "stay canned".
+            smart = remediation_mod.smart_remediation_for(
+                f,
+                rules_by_name=rules_by_name,
+                rules_by_acl=rules_by_acl,
+                web_acls=web_acl_summaries,
+                suspicious_sample=meta.get("suspicious_requests") or [],
+            )
+            if smart:
+                suggested_actions = list(smart["suggested_actions"])
+                evidence_samples = list(smart.get("evidence_samples") or [])
+                remediation_kind = "smart"
+            else:
+                suggested_actions = list(remediation["suggested_actions"])
+                evidence_samples = []
+                remediation_kind = "canned"
             finding_docs.append(
                 {
                     "audit_run_id": audit_run_id,
@@ -945,9 +962,11 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                     "evidence": f.get("evidence"),
                     "signature_class": f.get("signature_class"),
                     "impact": impact,
-                    "suggested_actions": list(remediation["suggested_actions"]),
+                    "suggested_actions": suggested_actions,
                     "verify_by": remediation["verify_by"],
                     "disclaimer": remediation["disclaimer"],
+                    "remediation_kind": remediation_kind,
+                    "evidence_samples": evidence_samples,
                     "created_at": _utcnow(),
                 }
             )

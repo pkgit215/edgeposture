@@ -671,8 +671,17 @@ function FindingCard({ f }) {
                 </div>
               )}
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Suggested actions
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <span>Suggested actions</span>
+                  {f.remediation_kind === "smart" && (
+                    <span
+                      data-testid="smart-remediation-badge"
+                      className="rounded-full bg-emerald-50 px-2 py-[1px] text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-200"
+                      title="Generated from this account's WAF inventory"
+                    >
+                      🎯 Account-specific
+                    </span>
+                  )}
                 </div>
                 <ul
                   data-testid="suggested-actions"
@@ -682,6 +691,22 @@ function FindingCard({ f }) {
                     <li key={i}>{a}</li>
                   ))}
                 </ul>
+                {Array.isArray(f.evidence_samples) &&
+                  f.evidence_samples.length > 0 && (
+                    <div
+                      data-testid="evidence-samples"
+                      className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+                    >
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                        Example matched requests
+                      </div>
+                      <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-slate-700">
+                        {f.evidence_samples.map((s, i) => (
+                          <li key={i}>- {s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
               </div>
               {verifyBy && (
                 <div>
