@@ -257,7 +257,12 @@ def _what_was_tested(audit_run: Dict[str, Any],
     log_source = audit_run.get("log_source") or "CloudWatch Logs"
     web_acl_count = audit_run.get("web_acl_count") or 0
     rule_count = audit_run.get("rule_count") or 0
-    scope = audit_run.get("scope") or "REGIONAL"
+    # Phase 5.2 — display BOTH scopes when both were scanned.
+    scopes = audit_run.get("scopes") or []
+    if scopes:
+        scope = " + ".join(sorted(set(scopes)))
+    else:
+        scope = audit_run.get("scope") or "REGIONAL"
 
     header = Paragraph(
         "<font color='%s'><b>What was tested</b></font>" % MUTED.hexval(),

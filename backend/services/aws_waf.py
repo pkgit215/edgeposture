@@ -267,70 +267,112 @@ def _derive_action(rule: Dict[str, Any]) -> str:
     return derive_mode(rule, kind)
 
 
+def _is_access_denied(exc: Exception) -> bool:
+    """Robustly detect IAM/auth denials across all boto3 exception shapes."""
+    try:
+        resp = getattr(exc, "response", None) or {}
+        code = (resp.get("Error") or {}).get("Code") or ""
+    except Exception:  # noqa: BLE001
+        code = ""
+    if code in ("AccessDeniedException", "AccessDenied", "UnauthorizedOperation"):
+        return True
+    # botocore may not populate response.Error for some exception classes;
+    # fall back to checking class name.
+    cls = type(exc).__name__
+    return cls in ("AccessDeniedException", "AccessDenied", "UnauthorizedOperation")
+
+
+def list_cloudfront_distributions_for_web_acl(
+    session: boto3.Session, web_acl_arn: str
+) -> Optional[List[Dict[str, str]]]:
+    """Phase 5.2 — REAL CloudFront attachment detection.
+
+    `wafv2:list-resources-for-web-acl` is unreliable for CLOUDFRONT scope
+    (the API often returns [] even for attached ACLs). The canonical way
+    to find which CloudFront distributions reference a Web ACL is to
+    page `cloudfront:list-distributions` and filter by `WebACLId == arn`.
+
+    Returns a list of `{"arn": ..., "id": ..., "domain_name": ...}` or
+    None if AccessDenied / API unreachable (treated as Unknown by caller).
+    """
+    try:
+        cf = session.client("cloudfront")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("cloudfront client construction failed: %s", exc)
+        return None
+    try:
+        paginator = cf.get_paginator("list_distributions")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("cloudfront paginator unavailable: %s", exc)
+        return None
+    matching: List[Dict[str, str]] = []
+    try:
+        for page in paginator.paginate():
+            dist_list = (page.get("DistributionList") or {})
+            for d in dist_list.get("Items", []) or []:
+                if d.get("WebACLId") == web_acl_arn:
+                    matching.append({
+                        "arn": d.get("ARN") or "",
+                        "id": d.get("Id") or "",
+                        "domain_name": d.get("DomainName") or "",
+                    })
+    except ClientError as exc:
+        if _is_access_denied(exc):
+            logger.warning(
+                "cloudfront:ListDistributions AccessDenied — add the perm to "
+                "the customer role to enable CloudFront attachment detection."
+            )
+            return None
+        logger.warning("cloudfront:ListDistributions failed: %s", exc)
+        return None
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("cloudfront:ListDistributions failed: %s", exc)
+        return None
+    return matching
+
+
 def list_resources_for_web_acl(
     session: boto3.Session, web_acl: Dict[str, Any]
 ) -> Optional[List[str]]:
     """Phase 5: Return all resource ARNs the Web ACL is associated with.
 
-    Return semantics (production fix):
+    Return semantics:
       * `[]`   → ACL is genuinely orphaned (API succeeded, no associations)
-      * `None` → attachment status UNKNOWN (AccessDenied / API not supported
-                  for this scope). Callers MUST NOT treat None as orphan.
+      * `None` → attachment status UNKNOWN (AccessDenied / API unreachable)
       * `[...]`→ attached to the listed resources.
 
-    For CLOUDFRONT scope the WAFv2 API only enumerates *some* distribution
-    associations — distributions associated via the CloudFront side are
-    not always reported. We treat that case as 'unknown' to avoid
-    false-positive orphan findings on CloudFront ACLs.
+    Phase 5.2 fixes:
+      * Don't abort the regional loop on FIRST AccessDenied — retry the
+        denied resource types once after a 2-second backoff (handles IAM
+        propagation lag), then keep going. The function only returns None
+        if EVERY resource type call failed (no partial-success window).
+      * CloudFront scope now uses `list_cloudfront_distributions_for_web_acl`
+        (cloudfront:ListDistributions) which IS reliable — wafv2's
+        list_resources_for_web_acl is the broken API for CF.
     """
     scope = web_acl.get("Scope", "REGIONAL")
-    arns: List[str] = []
-    saw_success = False
     region = "us-east-1" if scope == "CLOUDFRONT" else web_acl.get("Region", DEFAULT_REGION)
-    client = session.client("wafv2", region_name=region)
-
-    def _is_access_denied(exc: Exception) -> bool:
-        code = getattr(getattr(exc, "response", {}), "get", lambda *_: {})("Error", {}).get("Code") if hasattr(exc, "response") else None
-        return code in ("AccessDeniedException", "AccessDenied", "UnauthorizedOperation")
 
     if scope == "CLOUDFRONT":
-        # CloudFront associations live on the CloudFront side; WAFv2's
-        # list_resources_for_web_acl on CLOUDFRONT scope returns an empty
-        # list even for attached ACLs. Treat as 'unknown' rather than
-        # claiming orphan.
-        try:
-            resp = client.list_resources_for_web_acl(WebACLArn=web_acl["ARN"])
-            saw_success = True
-            for r in resp.get("ResourceArns", []) or []:
-                arns.append(r)
-        except ClientError as exc:
-            if _is_access_denied(exc):
-                logger.warning(
-                    "list_resources_for_web_acl CLOUDFRONT AccessDenied for %s — "
-                    "IAM role missing wafv2:ListResourcesForWebACL. Treating as UNKNOWN.",
-                    web_acl.get("Name"),
-                )
-                return None
-            logger.warning("list_resources_for_web_acl CLOUDFRONT failed: %s", exc)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("list_resources_for_web_acl CLOUDFRONT failed: %s", exc)
+        dists = list_cloudfront_distributions_for_web_acl(session, web_acl["ARN"])
+        if dists is None:
             return None
-        # CloudFront returns from this API are unreliable — even on success
-        # with [], the ACL may be attached via the CF side. Don't claim
-        # orphan: return None when CF returned [].
-        if saw_success and not arns:
-            return None
-        return arns
+        return [d["arn"] for d in dists if d.get("arn")]
 
-    # REGIONAL — iterate the documented resource types.
-    for rt in (
+    client = session.client("wafv2", region_name=region)
+    arns: List[str] = []
+    saw_success = False
+    denied_rts: List[str] = []
+    other_failure_rts: List[str] = []
+    resource_types = (
         "APPLICATION_LOAD_BALANCER",
         "API_GATEWAY",
         "APPSYNC",
         "COGNITO_USER_POOL",
         "APP_RUNNER_SERVICE",
         "VERIFIED_ACCESS_INSTANCE",
-    ):
+    )
+    for rt in resource_types:
         try:
             resp = client.list_resources_for_web_acl(
                 WebACLArn=web_acl["ARN"], ResourceType=rt
@@ -340,18 +382,54 @@ def list_resources_for_web_acl(
                 arns.append(r)
         except ClientError as exc:
             if _is_access_denied(exc):
-                logger.warning(
-                    "list_resources_for_web_acl REGIONAL AccessDenied for %s — "
-                    "IAM role missing wafv2:ListResourcesForWebACL. Treating as UNKNOWN.",
-                    web_acl.get("Name"),
+                denied_rts.append(rt)
+            else:
+                other_failure_rts.append(rt)
+                logger.debug(
+                    "list_resources_for_web_acl %s on %s skipped: %s",
+                    rt, web_acl.get("Name"), exc,
                 )
-                return None
-            logger.debug("list_resources_for_web_acl %s skipped: %s", rt, exc)
         except Exception as exc:  # noqa: BLE001
+            other_failure_rts.append(rt)
             logger.debug("list_resources_for_web_acl %s skipped: %s", rt, exc)
-    # If we never got a single successful API call, status is unknown.
+
+    # Phase 5.2 fix: retry denied resource types once after a short wait
+    # (IAM propagation can take 5-15 seconds, well within retry budget).
+    if denied_rts and not saw_success:
+        logger.info(
+            "list_resources_for_web_acl: %d resource types denied on %s. "
+            "Sleeping 2s and retrying (IAM propagation hedge).",
+            len(denied_rts), web_acl.get("Name"),
+        )
+        time.sleep(2)
+        for rt in denied_rts:
+            try:
+                resp = client.list_resources_for_web_acl(
+                    WebACLArn=web_acl["ARN"], ResourceType=rt
+                )
+                saw_success = True
+                for r in resp.get("ResourceArns", []) or []:
+                    arns.append(r)
+            except ClientError as exc:
+                if _is_access_denied(exc):
+                    continue  # still denied
+                logger.debug(
+                    "list_resources_for_web_acl retry %s skipped: %s", rt, exc
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("list_resources_for_web_acl retry %s skipped: %s", rt, exc)
+
     if not saw_success:
+        # EVERY call failed → genuinely Unknown (no permission, or API down).
+        if denied_rts:
+            logger.warning(
+                "list_resources_for_web_acl REGIONAL all-denied for %s — "
+                "IAM role missing wafv2:ListResourcesForWebACL. Treating as UNKNOWN.",
+                web_acl.get("Name"),
+            )
         return None
+    # At least one resource type returned successfully — the empty/non-empty
+    # `arns` list is now a real signal: empty means truly orphan.
     return arns
 
 

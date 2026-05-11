@@ -73,6 +73,37 @@ yarn test                             # vitest + React Testing Library
 
 When `RULEIQ_SPA_DIST` (default `/app/static` in the container) points to a directory containing `index.html`, FastAPI mounts it at `/`. API routes (`/api/*`) are registered first and therefore always win over the SPA catch-all. If the directory is missing the mount is silently skipped, so `pytest` and pure-API local dev are unaffected.
 
+## Phase 5.2 — IAM permissions required for full attachment detection
+
+The customer audit role (`cloudformation/customer-role.yaml`) needs TWO permissions to
+correctly enumerate Web ACL attachments and avoid "Unknown" status in the PDF:
+
+- `wafv2:ListResourcesForWebACL` — regional ALB / API Gateway / AppSync attachments
+- `cloudfront:ListDistributions`  — CloudFront-scope ACL attachments (`wafv2`'s
+  own `ListResourcesForWebACL` is documented but unreliable for CloudFront)
+
+Both are included in the updated CFN template. If you have a live role that was
+created before Phase 5.2, attach them as inline policies for IMMEDIATE effect
+(faster than re-running the CFN stack update):
+
+```bash
+ROLE_NAME=ruleiq-audit-role   # or whatever your role is named
+
+aws iam put-role-policy \
+  --role-name $ROLE_NAME \
+  --policy-name RuleIQWafv2ListResources \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"wafv2:ListResourcesForWebACL","Resource":"*"}]}'
+
+aws iam put-role-policy \
+  --role-name $ROLE_NAME \
+  --policy-name RuleIQCFListDistributions \
+  --policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"cloudfront:ListDistributions","Resource":"*"}]}'
+```
+
+IAM propagation typically takes 5–15 seconds. RuleIQ's `list_resources_for_web_acl`
+already retries once after a 2-second backoff on AccessDenied to hedge the
+propagation window.
+
 ### Environment variables (deployed)
 
 | Variable                          | Purpose                                                 | Default              |

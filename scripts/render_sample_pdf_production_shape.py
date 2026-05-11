@@ -50,7 +50,18 @@ def main():
         _url_encoded_xss_event(),
         _benign_event(),
     ]
-    sess = _MockSession(events=events)
+
+    # Phase 5.2 — extend the mock session with a CloudFront paginator
+    # so the CF ACL gets a REAL attached distribution.
+    from test_phase5_integration import _CFAwareMockSession, CF_DISTRO_ARN, CF_DISTRO_ID
+    sess = _CFAwareMockSession(
+        events=events,
+        wafv2_mode="regional_orphan",  # regional ACL is truly orphaned
+        distributions=[
+            {"Id": CF_DISTRO_ID, "ARN": CF_DISTRO_ARN,
+             "WebACLId": CLOUDFRONT_ACL_ARN, "DomainName": "d1234.cloudfront.net"},
+        ],
+    )
     aws_waf.assume_role = lambda *_a, **_kw: sess
     aws_waf.list_web_acls = lambda *_a, **_kw: [
         {"Name": "ruleiq-test-acl", "Id": "abc-123", "Scope": "REGIONAL",

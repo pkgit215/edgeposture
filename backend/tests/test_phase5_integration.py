@@ -669,3 +669,278 @@ def test_pdf_renders_web_acl_section_against_real_shape_audit(client, db, monkey
     assert "ruleiq-test-acl" in text
     # Mode column must say "Block (group)" not "ALLOW" for the managed rule
     assert "Block (group)" in text, "PDF mode column missing 'Block (group)' label"
+
+
+# ---------------------------------------------------------------------------
+# Phase 5.2 — CloudFront attachment + resource-aware duplicate detection
+# ---------------------------------------------------------------------------
+
+
+class _MockCloudFrontClient:
+    """boto3 CloudFront client returning a pre-canned list_distributions."""
+
+    def __init__(self, distributions: List[Dict[str, Any]], access_denied: bool = False):
+        self.distributions = distributions
+        self.access_denied = access_denied
+        self.calls: List[str] = []
+
+    def get_paginator(self, name: str):
+        outer = self
+
+        class _Paginator:
+            def paginate(self_inner):
+                outer.calls.append("list_distributions")
+                if outer.access_denied:
+                    raise ClientError(
+                        {"Error": {"Code": "AccessDeniedException", "Message": "denied"}},
+                        "ListDistributions",
+                    )
+                yield {"DistributionList": {"Items": outer.distributions}}
+
+        return _Paginator()
+
+
+class _CFAwareMockSession(_MockSession):
+    """Extends the real-shape mock session with a cloudfront client."""
+
+    def __init__(self, *, distributions=None, cf_access_denied=False, **kw):
+        super().__init__(**kw)
+        self.cf = _MockCloudFrontClient(distributions or [], access_denied=cf_access_denied)
+
+    def client(self, service, region_name=None):
+        if service == "cloudfront":
+            return self.cf
+        return super().client(service, region_name=region_name)
+
+
+CF_DISTRO_ARN = "arn:aws:cloudfront::371126261144:distribution/EKOXAVPA9GX2R"
+CF_DISTRO_ID = "EKOXAVPA9GX2R"
+
+
+def test_cloudfront_attachment_via_list_distributions():
+    """Task 5.2 #1: real CloudFront attachment detection."""
+    sess = _CFAwareMockSession(distributions=[
+        {"Id": CF_DISTRO_ID, "ARN": CF_DISTRO_ARN, "WebACLId": CLOUDFRONT_ACL_ARN, "DomainName": "d123.cloudfront.net"},
+        {"Id": "OTHER123", "ARN": "arn:aws:cloudfront::1:distribution/OTHER123", "WebACLId": "arn:other", "DomainName": "other.cloudfront.net"},
+    ])
+    result = aws_waf.list_cloudfront_distributions_for_web_acl(sess, CLOUDFRONT_ACL_ARN)
+    assert result is not None
+    assert len(result) == 1
+    assert result[0]["arn"] == CF_DISTRO_ARN
+    assert result[0]["id"] == CF_DISTRO_ID
+
+    # Wired into list_resources_for_web_acl: CLOUDFRONT scope → CF distros
+    arns = aws_waf.list_resources_for_web_acl(
+        sess,
+        {"Name": "ruleiq-cf-acl", "Scope": "CLOUDFRONT", "ARN": CLOUDFRONT_ACL_ARN},
+    )
+    assert arns == [CF_DISTRO_ARN]
+
+
+def test_cloudfront_access_denied_returns_none_not_empty():
+    sess = _CFAwareMockSession(cf_access_denied=True)
+    result = aws_waf.list_cloudfront_distributions_for_web_acl(sess, CLOUDFRONT_ACL_ARN)
+    assert result is None
+    arns = aws_waf.list_resources_for_web_acl(
+        sess,
+        {"Name": "ruleiq-cf-acl", "Scope": "CLOUDFRONT", "ARN": CLOUDFRONT_ACL_ARN},
+    )
+    assert arns is None, "CF AccessDenied must be Unknown, not []"
+
+
+def test_regional_truly_orphaned_returns_empty_list():
+    """Task 5.2 #2: empty ResourceArns from a successful regional call must
+    map to [] (truly orphan), NOT None (unknown)."""
+    sess = _MockSession(wafv2_mode="regional_orphan")
+    arns = aws_waf.list_resources_for_web_acl(
+        sess,
+        {"Name": "ruleiq-test-acl", "Scope": "REGIONAL", "ARN": REGIONAL_ACL_ARN, "Region": "us-east-1"},
+    )
+    assert arns == [], f"expected [], got {arns!r}"
+
+
+def test_scope_field_shows_both_when_both_scanned():
+    """Task 5.2 #3: PDF renderer outputs combined scope string."""
+    from services.pdf_report import render_audit_pdf
+    from pypdf import PdfReader
+    import io
+
+    audit_run = {
+        "_id": "x", "account_id": "371126261144",
+        "data_source": "aws", "rule_count": 0, "web_acl_count": 0,
+        "estimated_waste_usd": 0.0, "estimated_waste_breakdown": [],
+        "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+        "completed_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc),
+        "scopes": ["CLOUDFRONT", "REGIONAL"],
+        "web_acls": [
+            {"name": "regional", "scope": "REGIONAL", "attached": True, "attached_resources": ["arn:alb"]},
+            {"name": "cf", "scope": "CLOUDFRONT", "attached": True, "attached_resources": [CF_DISTRO_ARN]},
+        ],
+    }
+    pdf = render_audit_pdf(audit_run, [], [])
+    text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
+    assert "REGIONAL + CLOUDFRONT" in text or "CLOUDFRONT + REGIONAL" in text
+
+
+def _dup_finding(name: str, acls: List[str]) -> Dict[str, Any]:
+    return {
+        "type": "quick_win",
+        "severity": "low",
+        "affected_rules": [name] * len(acls),
+        "title": f"Duplicate rule '{name}'",
+        "description": "AI flagged duplicate.",
+        "recommendation": "Consolidate.",
+        "confidence": 0.7,
+    }
+
+
+def _make_rule(name: str, acl: str) -> Dict[str, Any]:
+    return {"rule_name": name, "web_acl_name": acl, "rule_kind": "custom",
+            "fms_managed": False}
+
+
+def test_duplicate_finding_suppressed_when_different_resources():
+    """Task 5.2 #4: same rule name in two ACLs attached to DIFFERENT
+    resources is NOT a duplicate — suppress."""
+    rules_by_name = {"BlockAdminPath": _make_rule("BlockAdminPath", "acl-a")}
+    # Duplicate finding's affected_rules list each unique name once;
+    # to express "same name in 2 ACLs" we feed 2 rules sharing the name.
+    rules_in_finding = [
+        _make_rule("BlockAdminPath", "acl-a"),
+        _make_rule("BlockAdminPath", "acl-b"),
+    ]
+    # Inject both into rules_by_name keyed by name. The function reads by
+    # affected_rules names so we use a trick: two entries in the finding.
+    finding = {
+        **_dup_finding("BlockAdminPath", ["acl-a", "acl-b"]),
+        "affected_rules": ["BlockAdminPath__a", "BlockAdminPath__b"],
+    }
+    rbm = {
+        "BlockAdminPath__a": {**_make_rule("BlockAdminPath", "acl-a")},
+        "BlockAdminPath__b": {**_make_rule("BlockAdminPath", "acl-b")},
+    }
+    rba = {
+        "acl-a": [rbm["BlockAdminPath__a"]],
+        "acl-b": [rbm["BlockAdminPath__b"]],
+    }
+    summaries = [
+        {"name": "acl-a", "scope": "REGIONAL", "attached": True,
+         "attached_resources": ["arn:aws:elasticloadbalancing:.../app/alb-a/x"]},
+        {"name": "acl-b", "scope": "CLOUDFRONT", "attached": True,
+         "attached_resources": ["arn:aws:cloudfront::1:distribution/E1"]},
+    ]
+    result = audit_mod._resource_aware_duplicate_findings(
+        [finding], rbm, rba, summaries
+    )
+    assert result == [], f"expected suppression, got {result}"
+
+
+def test_duplicate_finding_emitted_when_same_resource():
+    """Task 5.2 #5: shared resource ARN → real duplicate."""
+    finding = {
+        **_dup_finding("BlockAdminPath", ["acl-a", "acl-b"]),
+        "affected_rules": ["BlockAdminPath__a", "BlockAdminPath__b"],
+    }
+    rbm = {
+        "BlockAdminPath__a": _make_rule("BlockAdminPath", "acl-a"),
+        "BlockAdminPath__b": _make_rule("BlockAdminPath", "acl-b"),
+    }
+    rba = {"acl-a": [rbm["BlockAdminPath__a"]], "acl-b": [rbm["BlockAdminPath__b"]]}
+    summaries = [
+        {"name": "acl-a", "scope": "REGIONAL", "attached": True,
+         "attached_resources": [ALB_ARN]},
+        {"name": "acl-b", "scope": "REGIONAL", "attached": True,
+         "attached_resources": [ALB_ARN]},
+    ]
+    result = audit_mod._resource_aware_duplicate_findings(
+        [finding], rbm, rba, summaries
+    )
+    assert len(result) == 1
+    assert result[0]["type"] == "quick_win"
+    assert result[0]["evidence"] == "shared_resource"
+    assert "shared" in result[0]["description"].lower() or "share" in result[0]["description"].lower() or "overlap" in result[0]["description"].lower()
+
+
+def test_stranded_rule_finding_when_one_acl_orphaned():
+    """Task 5.2 #6: one attached, one orphan, same rule → 'stranded' finding."""
+    finding = {
+        **_dup_finding("BlockAdminPath", ["acl-a", "acl-b"]),
+        "affected_rules": ["BlockAdminPath__a", "BlockAdminPath__b"],
+    }
+    rbm = {
+        "BlockAdminPath__a": _make_rule("BlockAdminPath", "acl-a"),
+        "BlockAdminPath__b": _make_rule("BlockAdminPath", "acl-b"),
+    }
+    rba = {"acl-a": [rbm["BlockAdminPath__a"]], "acl-b": [rbm["BlockAdminPath__b"]]}
+    summaries = [
+        {"name": "acl-a", "scope": "REGIONAL", "attached": True,
+         "attached_resources": [ALB_ARN]},
+        {"name": "acl-b", "scope": "REGIONAL", "attached": False,
+         "attached_resources": []},
+    ]
+    result = audit_mod._resource_aware_duplicate_findings(
+        [finding], rbm, rba, summaries
+    )
+    assert len(result) == 1
+    assert result[0]["evidence"] == "stranded"
+    assert "acl-b" in result[0]["description"]
+
+
+def test_duplicate_finding_unverified_when_attachment_unknown():
+    """Both ACLs Unknown attachment → low-confidence verify finding."""
+    finding = {
+        **_dup_finding("BlockAdminPath", ["acl-a", "acl-b"]),
+        "affected_rules": ["BlockAdminPath__a", "BlockAdminPath__b"],
+    }
+    rbm = {
+        "BlockAdminPath__a": _make_rule("BlockAdminPath", "acl-a"),
+        "BlockAdminPath__b": _make_rule("BlockAdminPath", "acl-b"),
+    }
+    rba = {"acl-a": [rbm["BlockAdminPath__a"]], "acl-b": [rbm["BlockAdminPath__b"]]}
+    summaries = [
+        {"name": "acl-a", "scope": "REGIONAL", "attached": None,
+         "attached_resources": []},
+        {"name": "acl-b", "scope": "CLOUDFRONT", "attached": True,
+         "attached_resources": [CF_DISTRO_ARN]},
+    ]
+    result = audit_mod._resource_aware_duplicate_findings(
+        [finding], rbm, rba, summaries
+    )
+    assert len(result) == 1
+    assert result[0]["evidence"] == "unverified"
+    assert result[0]["confidence"] == 0.5
+
+
+def test_regional_access_denied_then_retry_succeeds(monkeypatch):
+    """Phase 5.2 Fix A: don't return None on first AccessDenied. Retry
+    after backoff before declaring Unknown."""
+    call_log: List[str] = []
+
+    class _RetrySession:
+        def __init__(self):
+            self.client_obj = self  # acts as its own client
+
+        def client(self, service, region_name=None):
+            return self
+
+        def list_resources_for_web_acl(self, **kwargs):
+            rt = kwargs.get("ResourceType", "")
+            call_log.append(rt)
+            # First sweep: all 6 fail AccessDenied.
+            if len([c for c in call_log if c == rt]) == 1:
+                raise ClientError(
+                    {"Error": {"Code": "AccessDeniedException", "Message": "denied"}},
+                    "ListResourcesForWebACL",
+                )
+            # Retry sweep: succeed with empty.
+            return {"ResourceArns": []}
+
+    sess = _RetrySession()
+    # No-op the sleep so the test runs fast.
+    monkeypatch.setattr(aws_waf.time, "sleep", lambda _s: None)
+    arns = aws_waf.list_resources_for_web_acl(
+        sess,
+        {"Name": "ruleiq-test-acl", "Scope": "REGIONAL", "ARN": REGIONAL_ACL_ARN, "Region": "us-east-1"},
+    )
+    # After retry succeeded with empty, must return [] (truly orphan), not None.
+    assert arns == [], f"expected [], got {arns!r}; calls={call_log}"

@@ -289,6 +289,150 @@ def _is_protected_rule(rule: Dict[str, Any]) -> bool:
     return False
 
 
+def _resource_aware_duplicate_findings(
+    findings: List[Dict[str, Any]],
+    rules_by_name: Dict[str, Dict[str, Any]],
+    rules_by_acl: Dict[str, List[Dict[str, Any]]],
+    acl_summaries: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Phase 5.2 — replace naive name-based duplicate findings with
+    resource-aware logic.
+
+    For each `quick_win`/`duplicate`-shaped finding whose `affected_rules`
+    list contains multiple rules with the SAME name (or substantially
+    overlapping statement_json), determine the relationship between the
+    parent Web ACLs' attached resources:
+
+      * Same resource ARN in both ACLs → REAL duplicate, severity LOW,
+        evidence='shared_resource'.
+      * Both ACLs attached to entirely different resources → SUPPRESS.
+        These are intentional "consistent policy" replicas.
+      * One ACL orphan, one attached → "stranded rule" finding, LOW,
+        evidence='stranded'.
+      * Either ACL's attachment unknown → low-confidence "verify" finding,
+        LOW, evidence='unverified', confidence=0.5.
+    """
+    by_acl_name_to_summary: Dict[str, Dict[str, Any]] = {
+        a["name"]: a for a in acl_summaries
+    }
+    out: List[Dict[str, Any]] = []
+    for f in findings:
+        ftype = f.get("type")
+        # Only re-evaluate "quick_win" findings that look like cross-ACL
+        # duplicates. A naive duplicate finding will list >= 2 rules with
+        # the same name spread across >= 2 ACLs.
+        if ftype != "quick_win":
+            out.append(f)
+            continue
+        affected_names = list(f.get("affected_rules") or [])
+        # Group rules by their (rule_name) and observe their parent ACLs.
+        rules_in_finding = [rules_by_name[n] for n in affected_names if n in rules_by_name]
+        if len(rules_in_finding) < 2:
+            out.append(f)
+            continue
+        # Look for any sub-pair that share the same rule_name across ACLs.
+        name_to_acl: Dict[str, List[str]] = {}
+        for r in rules_in_finding:
+            name_to_acl.setdefault(r["rule_name"], []).append(r["web_acl_name"])
+        cross_acl_groups = {
+            name: sorted(set(acls))
+            for name, acls in name_to_acl.items()
+            if len(set(acls)) >= 2
+        }
+        if not cross_acl_groups:
+            # Single-ACL quick_win — pass through unchanged.
+            out.append(f)
+            continue
+
+        new_findings_for_pair: List[Dict[str, Any]] = []
+        for rule_name, acl_names in cross_acl_groups.items():
+            summaries = [by_acl_name_to_summary.get(n) or {} for n in acl_names]
+            resources_per_acl = [set(s.get("attached_resources") or []) for s in summaries]
+            attached_flags = [s.get("attached") for s in summaries]
+            unknown = any(a is None for a in attached_flags)
+            both_attached = all(a is True for a in attached_flags)
+            any_orphan = any(a is False for a in attached_flags)
+            shared = set.intersection(*resources_per_acl) if resources_per_acl else set()
+            base = {
+                "affected_rules": [rule_name],
+                "confidence": float(f.get("confidence") or 0.7),
+            }
+            if both_attached and shared:
+                new_findings_for_pair.append({
+                    **base,
+                    "type": "quick_win",
+                    "severity": "low",
+                    "title": f"Duplicate rule '{rule_name}' across ACLs sharing a resource",
+                    "description": (
+                        f"Rule '{rule_name}' appears in ACLs {acl_names}, both "
+                        f"attached to overlapping resource(s): {sorted(shared)}. "
+                        "This is a real anti-pattern — consolidate into one ACL."
+                    ),
+                    "recommendation": (
+                        "Remove the duplicate from one ACL; pick the ACL whose "
+                        "rule set is most appropriate for the shared resource."
+                    ),
+                    "evidence": "shared_resource",
+                })
+            elif both_attached and not shared:
+                logger.info(
+                    "Suppressing duplicate finding for %r — ACLs %s protect "
+                    "DIFFERENT resources, not a real duplicate.",
+                    rule_name, acl_names,
+                )
+                # NOT a duplicate — intentional consistent policy across
+                # different resources. Suppressed.
+                continue
+            elif any_orphan and not all(a is False for a in attached_flags):
+                orphan_acls = [n for n, a in zip(acl_names, attached_flags) if a is False]
+                new_findings_for_pair.append({
+                    **base,
+                    "type": "quick_win",
+                    "severity": "low",
+                    "title": f"Stranded rule '{rule_name}' in orphaned ACL",
+                    "description": (
+                        f"Rule '{rule_name}' is duplicated in orphan ACL(s) "
+                        f"{orphan_acls} as well as attached ACL(s). The orphan "
+                        "copy protects nothing."
+                    ),
+                    "recommendation": (
+                        "Either attach the orphan ACL or delete it. Either "
+                        "way the duplicate rule should be consolidated."
+                    ),
+                    "evidence": "stranded",
+                })
+            elif unknown:
+                new_findings_for_pair.append({
+                    **base,
+                    "type": "quick_win",
+                    "severity": "low",
+                    "title": f"Potential duplicate rule '{rule_name}' (attachment unverified)",
+                    "description": (
+                        f"Rule '{rule_name}' appears in ACLs {acl_names}, but "
+                        "attachment status of one or both could not be "
+                        "verified (IAM permission or API limitation)."
+                    ),
+                    "recommendation": (
+                        "Grant cloudfront:ListDistributions and "
+                        "wafv2:ListResourcesForWebACL to the audit role and "
+                        "re-run to confirm whether this is a real duplicate."
+                    ),
+                    "confidence": 0.5,
+                    "evidence": "unverified",
+                })
+            else:
+                # Both orphan — let the orphaned_web_acl findings cover it;
+                # no separate duplicate emission needed.
+                logger.info(
+                    "Both ACLs in finding %r are orphaned — suppressing "
+                    "duplicate, covered by orphan findings.", rule_name,
+                )
+        if new_findings_for_pair:
+            out.extend(new_findings_for_pair)
+        # If we re-emitted no findings (all suppressed), drop the original.
+    return out
+
+
 def _apply_phase5_finding_guardrails(
     findings: List[Dict[str, Any]],
     rules_by_name: Dict[str, Dict[str, Any]],
@@ -482,6 +626,10 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
         # Phase 5 — apply guardrails AFTER LLM, then append orphan-ACL findings.
         guarded = _apply_phase5_finding_guardrails(
             raw_findings, rules_by_name, orphan_acl_names
+        )
+        # Phase 5.2 — replace naive name-based duplicates with resource-aware logic.
+        guarded = _resource_aware_duplicate_findings(
+            guarded, rules_by_name, rules_by_acl, web_acl_summaries
         )
         orphan_findings = _orphaned_acl_findings(web_acl_summaries, rules_by_acl)
         final_findings = guarded + orphan_findings
