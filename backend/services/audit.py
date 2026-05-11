@@ -232,6 +232,12 @@ def _load_rules_from_aws(
                             "event": ev,
                         })
                 if sample:
+                    # Phase 5.3.2 — tag each event with the originating
+                    # Web ACL name so detect_bypasses can populate
+                    # affected_rules deterministically.
+                    for ev in sample:
+                        if isinstance(ev, dict):
+                            ev.setdefault("_web_acl_name", acl["Name"])
                     per_acl_samples.append(sample)
                 logger.info(
                     "Bypass sampler | acl=%s log_group=%s "
@@ -372,6 +378,8 @@ def _resource_aware_duplicate_findings(
             return out
 
         new_findings_for_pair: List[Dict[str, Any]] = []
+        original_type = ftype
+        is_conflict_input = original_type in ("conflict", "rule_conflict")
         for rule_name, acl_names in cross_acl_groups.items():
             summaries = [by_acl_name_to_summary.get(n) or {} for n in acl_names]
             resources_per_acl = [_arns_of(s) for s in summaries]
@@ -402,13 +410,39 @@ def _resource_aware_duplicate_findings(
                     "evidence": "shared_resource",
                 })
             elif both_attached and not shared:
-                logger.info(
-                    "Suppressing duplicate finding for %r — ACLs %s protect "
-                    "DIFFERENT resources, not a real duplicate.",
-                    rule_name, acl_names,
-                )
-                # NOT a duplicate — intentional consistent policy across
-                # different resources. Suppressed.
+                if is_conflict_input:
+                    # Phase 5.3.2 regression fix — `conflict` findings
+                    # for same-named rules across DIFFERENT attached
+                    # resources are still meaningful: contradictory
+                    # match conditions create unpredictable behaviour
+                    # if the topology ever changes. Keep them.
+                    new_findings_for_pair.append({
+                        **base,
+                        "type": "conflict",
+                        "severity": f.get("severity") or "medium",
+                        "title": f"Same-named rule '{rule_name}' across distinct ACLs",
+                        "description": (
+                            f"Rule '{rule_name}' appears in attached ACLs "
+                            f"{acl_names}, each protecting different "
+                            f"resources. Verify the statements are "
+                            f"intentionally identical — otherwise the pair "
+                            f"is silently divergent."
+                        ),
+                        "recommendation": (
+                            "Diff the two rule statements. If identical, "
+                            "this is consistent policy across resources — "
+                            "no action. If divergent, reconcile or rename."
+                        ),
+                        "evidence": "cross_acl_same_name",
+                    })
+                else:
+                    logger.info(
+                        "Suppressing duplicate finding for %r — ACLs %s "
+                        "protect DIFFERENT resources, not a real duplicate.",
+                        rule_name, acl_names,
+                    )
+                    # NOT a duplicate — intentional consistent policy
+                    # across different resources. Suppressed.
                 continue
             elif any_orphan and not all(a is False for a in attached_flags):
                 orphan_acls = [n for n, a in zip(acl_names, attached_flags) if a is False]
@@ -757,9 +791,18 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
             return
 
         suspicious_reqs = meta.get("suspicious_requests")
+        # Phase 5.3.2 — ACL-name fallback so detect_bypasses always has
+        # a non-empty affected_rules even if the suspicious-request
+        # objects weren't pre-tagged with `_web_acl_name`.
+        attached_acl_names_for_bypass = [
+            s.get("name") for s in (meta.get("web_acls") or [])
+            if s.get("name") and s.get("attached") is not False
+        ]
         if suspicious_reqs:
             result = ai_pipeline.run_pipeline(
-                rules, suspicious_requests=suspicious_reqs
+                rules,
+                suspicious_requests=suspicious_reqs,
+                web_acl_names=attached_acl_names_for_bypass,
             )
         else:
             result = ai_pipeline.run_pipeline(rules)
@@ -835,6 +878,21 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                 continue
             f["affected_rules"] = list(attached_acl_names)
 
+        # Phase 5.3.2 — severity rubric calibration. `dead_rule` is
+        # MEDIUM by default; HIGH is reserved for cases corroborated by
+        # active attack-shaped traffic. Since signature-level
+        # corroboration requires pattern matching we don't yet do, we
+        # use a coarse heuristic: keep HIGH only when at least one
+        # `bypass_candidate` finding exists in the same audit (i.e.
+        # there IS attack traffic reaching origin somewhere).
+        _has_bypass = any(
+            x.get("type") == "bypass_candidate" for x in final_findings
+        )
+        for f in final_findings:
+            if f.get("type") == "dead_rule" and f.get("severity") == "high":
+                if not _has_bypass:
+                    f["severity"] = "medium"
+
         finding_docs: List[Dict[str, Any]] = []
         for f in final_findings:
             score = scoring.severity_score(
@@ -848,6 +906,8 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
             # finding doc so the API serializer and PDF renderer read
             # the same top-level fields.
             remediation = remediation_mod.remediation_for(f, rules_by_name)
+            # Phase 5.3.2 — Impact copy attached as a sibling field.
+            impact = remediation_mod.impact_for(f, rules_by_name)
             finding_docs.append(
                 {
                     "audit_run_id": audit_run_id,
@@ -860,6 +920,7 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                     "confidence": float(f.get("confidence", 0.0)),
                     "severity_score": score,
                     "evidence": f.get("evidence"),
+                    "impact": impact,
                     "suggested_actions": list(remediation["suggested_actions"]),
                     "verify_by": remediation["verify_by"],
                     "disclaimer": remediation["disclaimer"],

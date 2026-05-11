@@ -222,7 +222,7 @@ def client(db) -> TestClient:
 def test_health_reports_phase_5(client):
     resp = client.get("/api/health")
     assert resp.status_code == 200
-    assert resp.json()["phase"] == "5.3"
+    assert resp.json()["phase"] == "5.3.2"
 
 
 # ---- 7. End-to-end audit pipeline w/ mocked LLM ----------------------------

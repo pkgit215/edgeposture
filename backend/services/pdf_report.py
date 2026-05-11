@@ -491,12 +491,21 @@ def _render_finding(f: Dict[str, Any], fms_set: set,
             S["body_small"],
         ),
         Paragraph(desc, S["body_small"]),
+    ]
+    # Phase 5.3.2 — Impact paragraph between description and recommendation.
+    impact = f.get("impact")
+    if impact:
+        inner.append(Paragraph(
+            f"<b>Impact.</b> <font color='{INK.hexval()}'>{impact}</font>",
+            S["body_small"],
+        ))
+    inner.extend([
         Paragraph(f"<b>Recommendation.</b> {rec}", S["body_small"]),
         Paragraph(
             f"<font color='{MUTED.hexval()}'>Affected:</font> {affected_html}",
             S["body_small"],
         ),
-    ]
+    ])
     bar = _SeverityBar(sev, height=12 * len(inner))
     row = Table(
         [[bar, inner]],
@@ -1058,6 +1067,72 @@ def render_audit_pdf(
     story += _build_findings_detail(rules, findings, S)
     story += _build_web_acl_section(audit_run, S)
     story += _build_inventory_table(rules, S)
+    story += _build_methodology_appendix(S)
 
     doc.build(story)
     return buf.getvalue()
+
+
+def _build_methodology_appendix(S: Dict[str, ParagraphStyle]) -> List[Flowable]:
+    """Phase 5.3.2 — Methodology appendix appended after the inventory.
+
+    Mirrors the on-screen Methodology tab so a reviewer who only has the
+    PDF still understands how to interpret severity / score / confidence.
+    """
+    out: List[Flowable] = [PageBreak(), Paragraph("Methodology", S["h1"])]
+    out.append(Spacer(1, 8))
+
+    def _section(heading: str, body_lines: List[str]) -> None:
+        out.append(Paragraph(heading, S["h3"]))
+        for line in body_lines:
+            out.append(Paragraph(line, S["body_small"]))
+        out.append(Spacer(1, 6))
+
+    _section("Severity levels", [
+        "<b>HIGH</b> — Direct evidence of attack-shaped traffic reaching "
+        "origin, OR a dead / misconfigured rule whose stated purpose maps "
+        "to an active attack signature in this account's logs. Treat as "
+        "urgent.",
+        "<b>MEDIUM</b> — Configured protection is not engaging as designed "
+        "(dead custom rule, dead managed group, count-mode with hits). "
+        "No direct evidence of active exploitation in this audit window.",
+        "<b>LOW</b> — Operational hygiene. No security exposure, but "
+        "creates audit noise, cost waste, or onboarding friction.",
+    ])
+    _section("Severity score (0–10)", [
+        "A numeric refinement inside each level. <b>HIGH = 7.0–10.0</b>, "
+        "<b>MEDIUM = 4.0–6.9</b>, <b>LOW = 0.1–3.9</b>. Computed "
+        "deterministically from finding type, presence of corroborating "
+        "log evidence, rule kind (managed vs custom), and (for bypasses) "
+        "the CVE class of the matched signature.",
+        "Two findings of the same severity letter are sorted by score "
+        "descending in both UI and PDF.",
+    ])
+    _section("Confidence (0–100%)", [
+        "How sure RuleIQ is that this finding is real, not a false positive.",
+        "<b>90–100%:</b> structural — derived directly from AWS "
+        "configuration (e.g., a Web ACL with zero "
+        "<i>ListResourcesForWebACL</i> results is unambiguously orphaned).",
+        "<b>75–89%:</b> log-sample — derived from CloudWatch traffic plus "
+        "rule definitions (e.g., bypass detection from observed ALLOW'd "
+        "attack-shaped requests).",
+        "<b>Below 75%:</b> heuristic — derived from AI inference over rule "
+        "purpose. Treat as a starting point for human review, not as "
+        "ground truth.",
+    ])
+    _section("Evidence types", [
+        "<b>configuration</b> — pulled directly from <i>wafv2:GetWebACL</i>, "
+        "<i>ListResourcesForWebACL</i>, etc.",
+        "<b>log-sample</b> — derived from CloudWatch log inspection over "
+        "the 30-day window.",
+        "<b>ai-inference</b> — derived from GPT-4o reasoning over rule "
+        "JSON + statistics. Lowest weight.",
+    ])
+    _section("What RuleIQ does NOT do", [
+        "Does not write or modify any rule in your account.",
+        "Does not store AWS keys — uses STS AssumeRole each run, session "
+        "tokens only.",
+        "Does not generate new WAF rules. All Suggested Actions point at "
+        "existing AWS-managed rule groups or human configuration changes.",
+    ])
+    return out

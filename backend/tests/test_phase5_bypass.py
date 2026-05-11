@@ -181,7 +181,8 @@ def test_detect_bypasses_shapes_findings_correctly(monkeypatch):
 
     monkeypatch.setattr(ai_pipeline, "_chat_json", fake_chat)
     findings = ai_pipeline.detect_bypasses(
-        [{"httpRequest": {"uri": "/products", "args": "", "headers": []}}]
+        [{"httpRequest": {"uri": "/products", "args": "", "headers": []}}],
+        web_acl_names_fallback=["test-acl"],
     )
     assert len(findings) == 2
     for f in findings:
@@ -190,6 +191,8 @@ def test_detect_bypasses_shapes_findings_correctly(monkeypatch):
         assert f["severity"] in {"high", "medium", "low"}
         assert "Possible WAF bypass" in f["title"]
         assert f["confidence"] >= 0.0
+        # Phase 5.3.2 — invariant
+        assert f["affected_rules"] == ["test-acl"]
 
 
 def test_detect_bypasses_caps_input_at_50(monkeypatch):
@@ -224,7 +227,8 @@ def test_detect_bypasses_invalid_severity_normalised(monkeypatch):
 
     monkeypatch.setattr(ai_pipeline, "_chat_json", fake_chat)
     findings = ai_pipeline.detect_bypasses(
-        [{"httpRequest": {"uri": "/x", "args": "", "headers": []}}]
+        [{"httpRequest": {"uri": "/x", "args": "", "headers": []}}],
+        web_acl_names_fallback=["test-acl"],
     )
     assert findings[0]["severity"] == "low"
 
@@ -272,6 +276,7 @@ def test_run_pipeline_includes_pass3_findings(monkeypatch):
         suspicious_requests=[
             {"httpRequest": {"uri": "/api/foo", "args": "", "headers": []}}
         ],
+        web_acl_names=["acl"],
     )
     assert "pass1" in call_log and "pass2" in call_log and "pass3" in call_log
     bypass = [f for f in result["findings"] if f["type"] == "bypass_candidate"]
@@ -299,7 +304,7 @@ def test_audit_persists_bypass_finding_with_log_sample_evidence(client, db, monk
     """When the loader returns suspicious_requests, the persisted finding must
     carry evidence='log-sample' on the Mongo document."""
 
-    def fake_run_pipeline(rules, suspicious_requests=None):
+    def fake_run_pipeline(rules, suspicious_requests=None, **_kw):
         return {
             "rules": [{**r, "ai_explanation": {"explanation": "m", "working": True, "concerns": None}} for r in rules],
             "findings": [
@@ -575,7 +580,7 @@ def test_sample_then_pass3_produces_bypass_findings(monkeypatch):
         }
 
     monkeypatch.setattr(ai_pipeline, "_chat_json", fake_chat)
-    findings = ai_pipeline.detect_bypasses(sample)
+    findings = ai_pipeline.detect_bypasses(sample, web_acl_names_fallback=["acl-x"])
     assert len(findings) == 2
     for f in findings:
         assert f["type"] == "bypass_candidate"

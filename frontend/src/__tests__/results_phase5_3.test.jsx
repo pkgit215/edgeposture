@@ -129,7 +129,9 @@ describe("Phase 5.3 — Results UI", () => {
   it("shows the override-badge on rules with managed_rule_overrides", async () => {
     mockApi();
     render(<Results auditId={RUN.id} onGoConnect={() => {}} />);
-    // Switch to the "All rules" tab if needed — the headline panel is on the same page.
+    // Phase 5.3.2 — switch to the Rules tab first (where RuleBrowser lives).
+    const rulesTab = await screen.findByTestId("tab-rules");
+    fireEvent.click(rulesTab);
     const badge = await screen.findByTestId("override-badge");
     expect(badge.textContent).toMatch(/2 override/);
   });

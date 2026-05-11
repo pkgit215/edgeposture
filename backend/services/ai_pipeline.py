@@ -261,20 +261,47 @@ def generate_findings(rules_with_explanations: List[Dict[str, Any]]) -> List[Dic
     return findings
 
 
-def detect_bypasses(suspicious_requests: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def detect_bypasses(
+    suspicious_requests: List[Dict[str, Any]],
+    web_acl_names_fallback: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
     """Pass 3: produce `bypass_candidate` findings from real request logs.
 
     `suspicious_requests` MUST already be pre-filtered to:
       * responseCodeSent in 2xx/3xx (the request REACHED the origin), AND
       * top-N by `aws_waf.score_request_suspicion(req)`.
 
-    Returns a list of finding dicts shaped exactly like Pass-2 findings, each
-    tagged `evidence='log-sample'` so the audit-run merge step can persist
-    the provenance flag onto the Mongo document.
+    Phase 5.3.2 — each emitted bypass finding now has a NON-EMPTY
+    `affected_rules` populated from `_web_acl_name` tagged onto each
+    suspicious request by the audit pipeline. If tagging is missing
+    (legacy code path), falls back to `web_acl_names_fallback`.
+    The function asserts the invariant — tests will fail loud if a
+    bypass finding ever leaks out with empty `affected_rules`.
+
+    Returns a list of finding dicts shaped exactly like Pass-2 findings,
+    each tagged `evidence='log-sample'` so the audit-run merge step can
+    persist the provenance flag onto the Mongo document.
     """
     if not suspicious_requests:
         return []
-    payload = json.dumps({"requests": suspicious_requests[:50]})
+    # Collect every distinct Web ACL the suspicious-request sample
+    # came from. Used both for emission and for the affected_rules
+    # invariant assertion.
+    acl_names: List[str] = []
+    seen = set()
+    for req in suspicious_requests:
+        v = (req or {}).get("_web_acl_name")
+        if isinstance(v, str) and v and v not in seen:
+            acl_names.append(v); seen.add(v)
+    if not acl_names and web_acl_names_fallback:
+        for n in web_acl_names_fallback:
+            if isinstance(n, str) and n and n not in seen:
+                acl_names.append(n); seen.add(n)
+
+    payload = json.dumps({
+        "requests": [{k: v for k, v in (r or {}).items() if not k.startswith("_")}
+                     for r in suspicious_requests[:50]]
+    })
     parsed = _chat_json(PASS3_SYSTEM, payload)
     gaps = parsed.get("gaps", [])
     if not isinstance(gaps, list):
@@ -296,6 +323,14 @@ def detect_bypasses(suspicious_requests: List[Dict[str, Any]]) -> List[Dict[str,
             confidence = float(g.get("confidence") or 0.0)
         except (TypeError, ValueError):
             confidence = 0.0
+        # Phase 5.3.2 — affected_rules invariant.
+        affected = list(acl_names)
+        assert affected, (
+            f"detect_bypasses must never emit a finding with empty "
+            f"affected_rules. pattern={pattern!r} sample_size="
+            f"{len(suspicious_requests)} fallback="
+            f"{web_acl_names_fallback!r}"
+        )
         out.append(
             {
                 "type": "bypass_candidate",
@@ -306,7 +341,7 @@ def detect_bypasses(suspicious_requests: List[Dict[str, Any]]) -> List[Dict[str,
                     f"by the origin. Example: {example}"
                 ),
                 "recommendation": rec,
-                "affected_rules": [],  # log-derived — no specific rule
+                "affected_rules": affected,
                 "confidence": confidence,
                 "evidence": "log-sample",
             }
@@ -317,9 +352,14 @@ def detect_bypasses(suspicious_requests: List[Dict[str, Any]]) -> List[Dict[str,
 def run_pipeline(
     rules: List[Dict[str, Any]],
     suspicious_requests: Optional[List[Dict[str, Any]]] = None,
+    web_acl_names: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Run Pass 1 over every rule, Pass 2 over enriched list, optional Pass 3
     over suspicious request samples.
+
+    Phase 5.3.2 — `web_acl_names` is passed through to `detect_bypasses`
+    as a fallback for the `affected_rules` invariant when the suspicious
+    requests weren't pre-tagged by the audit pipeline.
 
     Returns:
         {"rules": [...with ai_explanation...], "findings": [...]}.
@@ -332,7 +372,10 @@ def run_pipeline(
     findings: List[Dict[str, Any]] = list(generate_findings(enriched))
     if suspicious_requests:
         try:
-            findings.extend(detect_bypasses(suspicious_requests))
+            findings.extend(detect_bypasses(
+                suspicious_requests,
+                web_acl_names_fallback=web_acl_names,
+            ))
         except Exception as exc:  # noqa: BLE001
             logger.warning("Pass-3 bypass detection failed: %s", exc)
     return {"rules": enriched, "findings": findings}

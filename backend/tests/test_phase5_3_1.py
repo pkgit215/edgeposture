@@ -41,7 +41,7 @@ def test_health_phase_is_5_3():
     resp = client.get("/api/health")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["phase"] == "5.3"
+    assert body["phase"] == "5.3.2"
 
 
 # --- Fix 1 — every finding type has remediation FLAT keys persisted --------
@@ -109,7 +109,7 @@ def test_wire_up_attaches_flat_remediation_keys_to_every_finding(monkeypatch):
     monkeypatch.setattr(audit_mod, "_load_rules_from_fixtures", fake_load)
     monkeypatch.setenv("DEMO_MODE", "true")
 
-    def fake_pipeline(rules, suspicious_requests=None):
+    def fake_pipeline(rules, suspicious_requests=None, **_kw):
         return {
             "rules": [{**r, "ai_explanation": {"explanation": "m",
                        "working": True, "concerns": None}} for r in rules],
@@ -173,7 +173,7 @@ def test_bypass_affected_rules_backfilled_with_web_acl_names(monkeypatch):
     monkeypatch.setattr(audit_mod, "_load_rules_from_fixtures", fake_load)
     monkeypatch.setenv("DEMO_MODE", "true")
 
-    def fake_pipeline(rules, suspicious_requests=None):
+    def fake_pipeline(rules, suspicious_requests=None, **_kw):
         return {
             "rules": [],
             "findings": [{

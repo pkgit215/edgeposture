@@ -144,6 +144,23 @@ _TABLE: Dict[str, Dict[str, Any]] = {
             "count includes the merged traffic."
         ),
     },
+    # Phase 5.3.2 — `quick_win_unused` sub-variant: a SINGLE custom rule
+    # that has no current traffic match and no duplicate pair (this is
+    # the BlockOldCurlScanners-style finding).
+    "quick_win_unused": {
+        "suggested_actions": [
+            (
+                "Verify with the rule's original author whether the "
+                "protection is still needed. If obsolete, delete the rule "
+                "to reduce console clutter and audit surface area."
+            ),
+        ],
+        "verify_by": (
+            "After deletion: confirm the rule is removed via "
+            "`aws wafv2 get-web-acl` and that the next 30-day audit no "
+            "longer flags it."
+        ),
+    },
     "count_mode_with_hits": {
         "suggested_actions": [
             (
@@ -271,6 +288,11 @@ def remediation_for(
         ftype = "stranded_rule"
     elif ftype == "quick_win" and evidence == "shared_resource":
         ftype = "quick_win"  # generic quick_win remediation
+    elif ftype == "quick_win":
+        # Phase 5.3.2 — `quick_win` with no shared_resource/stranded
+        # evidence is the single-unused-custom-rule variant (e.g.
+        # BlockOldCurlScanners). Different copy.
+        ftype = "quick_win_unused"
     elif ftype == "conflict":
         ftype = "rule_conflict"
 
@@ -298,3 +320,121 @@ def remediation_for(
         "verify_by": entry["verify_by"],
         "disclaimer": UNIVERSAL_DISCLAIMER,
     }
+
+
+
+# Phase 5.3.2 — `impact` field. One short paragraph per finding type
+# explaining the business / security consequence in plain English.
+# Copy is user-approved — do NOT paraphrase.
+_IMPACT_COPY: Dict[str, str] = {
+    "bypass_candidate": (
+        "Attack-shaped traffic is reaching your origin uninspected. If "
+        "the payload is genuinely malicious, your WAF is providing no "
+        "defense against this signature class. Direct relevance to "
+        "SOC 2 CC6.6, PCI-DSS 6.6, ISO 27001 A.13.1.2."
+    ),
+    "dead_rule_custom": (
+        "If this rule was intended to be active, the traffic it was "
+        "supposed to block is no longer being inspected. If obsolete, "
+        "it's creating noise that slows incident response and inflates "
+        "your rule-count quota."
+    ),
+    "dead_rule_managed": (
+        "Either traffic isn't reaching this rule group (routing problem) "
+        "or the rule group doesn't match your traffic patterns "
+        "(configuration problem). Either way, the protection you're "
+        "paying for isn't engaging."
+    ),
+    "orphaned_web_acl": (
+        "Pure operational waste — fixed monthly fee with zero traffic "
+        "served. Also creates audit confusion: reviewers see an "
+        "attached-looking Web ACL that does nothing."
+    ),
+    "count_mode_with_hits": (
+        "Rule appears active in the AWS console but is logging instead "
+        "of blocking. Attacks matching this signature are being recorded, "
+        "not stopped. Common cause: rule was deployed in COUNT for "
+        "evaluation and never promoted."
+    ),
+    "count_mode_high_volume": (
+        "Rule appears active in the AWS console but is logging instead "
+        "of blocking. Attacks matching this signature are being recorded, "
+        "not stopped. Common cause: rule was deployed in COUNT for "
+        "evaluation and never promoted."
+    ),
+    "count_mode_long_duration": (
+        "Rule appears active in the AWS console but is logging instead "
+        "of blocking. Attacks matching this signature are being recorded, "
+        "not stopped. Common cause: rule was deployed in COUNT for "
+        "evaluation and never promoted."
+    ),
+    "conflict": (
+        "Two rules with overlapping or identical match conditions create "
+        "unpredictable evaluation order, and one is effectively dead "
+        "code. Cleanup reduces noise in your audit and speeds future "
+        "incident response."
+    ),
+    "rule_conflict": (
+        "Two rules with overlapping or identical match conditions create "
+        "unpredictable evaluation order, and one is effectively dead "
+        "code. Cleanup reduces noise in your audit and speeds future "
+        "incident response."
+    ),
+    "fms_review": (
+        "You cannot fix this directly — the rule is controlled by "
+        "another team via Firewall Manager. But it appears in your audit "
+        "report and must either be escalated or formally accepted as "
+        "out-of-scope."
+    ),
+    "quick_win": (
+        "Low-risk rule cleanup. Reduces console clutter, improves "
+        "onboarding for new engineers, and shrinks your security review "
+        "surface area."
+    ),
+    "quick_win_unused": (
+        "Low-risk rule cleanup. Reduces console clutter, improves "
+        "onboarding for new engineers, and shrinks your security review "
+        "surface area."
+    ),
+    "stranded_rule": (
+        "A rule duplicate exists on an orphaned Web ACL that protects "
+        "nothing. The duplicate is dead code — it consumes audit "
+        "attention and adds to your rule-count quota without providing "
+        "any defense. Cleanup is mechanical: either delete the orphan "
+        "ACL or remove the redundant rule from it."
+    ),
+    "managed_rule_override_count": (
+        "A managed rule inside this group has been overridden to COUNT. "
+        "The override is invisible at the group level, but the specific "
+        "protection is logging, not blocking."
+    ),
+}
+
+
+def impact_for(
+    finding: Dict[str, Any],
+    rules_by_name: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> str:
+    """Phase 5.3.2 — return the canonical Impact copy for this finding.
+
+    `dead_rule` dispatches on managed vs custom (same dispatch as
+    remediation_for). `quick_win` with `evidence='stranded'` maps to the
+    `stranded_rule` copy. Unknown types fall through to an empty string
+    (the PDF / UI renderer treats empty as 'omit the section').
+    """
+    ftype = finding.get("type") or ""
+    evidence = finding.get("evidence")
+    if ftype == "quick_win" and evidence == "stranded":
+        key = "stranded_rule"
+    elif ftype == "quick_win" and evidence == "shared_resource":
+        key = "quick_win"
+    elif ftype == "quick_win":
+        key = "quick_win_unused"
+    elif ftype == "dead_rule":
+        kind = _affected_kind_hint(
+            list(finding.get("affected_rules") or []), rules_by_name
+        )
+        key = "dead_rule_managed" if kind == "managed" else "dead_rule_custom"
+    else:
+        key = ftype
+    return _IMPACT_COPY.get(key, "")

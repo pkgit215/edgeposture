@@ -166,7 +166,7 @@ def test_spa_mount_does_not_shadow_api_routes(tmp_path, monkeypatch):
         assert h.status_code == 200
         body = h.json()
         assert body["status"] == "ok"
-        assert body["phase"] == "5.3"
+        assert body["phase"] == "5.3.2"
 
         oa = client.get("/api/openapi.json")
         assert oa.status_code == 200

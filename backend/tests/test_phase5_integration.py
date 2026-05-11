@@ -367,7 +367,7 @@ def _patch_aws_path(monkeypatch, *, web_acls_meta, mock_session, mock_pipeline=T
     monkeypatch.setattr(aws_waf, "discover_logging", lambda *_a, **_kw: LOG_GROUP_ARN)
     monkeypatch.setenv("DEMO_MODE", "false")
     if mock_pipeline:
-        def fake_run_pipeline(rules, suspicious_requests=None):
+        def fake_run_pipeline(rules, suspicious_requests=None, **_kw):
             enriched = [{**r, "ai_explanation": {"explanation": "m", "working": True, "concerns": None}} for r in rules]
             findings = [
                 {

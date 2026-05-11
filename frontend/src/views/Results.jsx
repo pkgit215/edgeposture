@@ -24,6 +24,26 @@ const SEVERITY_STYLES = {
   low: "bg-gray-400 text-white",
 };
 
+// Phase 5.3.2 — Tooltip primitive. Native CSS hover; no new dependency.
+function Tooltip({ text, children }) {
+  return (
+    <span className="relative inline-block group">
+      {children}
+      <span
+        role="tooltip"
+        data-testid="tooltip-pop"
+        className="pointer-events-none absolute left-1/2 top-full z-30 mt-1 hidden w-64 -translate-x-1/2 rounded-md border border-slate-200 bg-white p-2 text-[11px] font-normal normal-case leading-snug text-slate-700 shadow-lg group-hover:block group-focus-within:block"
+      >
+        {text}
+        <br />
+        <span className="text-[10px] italic text-slate-500">
+          See Methodology tab
+        </span>
+      </span>
+    </span>
+  );
+}
+
 export default function Results({ auditId, onGoConnect }) {
   const [run, setRun] = useState(null);
   const [rules, setRules] = useState(null);
@@ -31,6 +51,8 @@ export default function Results({ auditId, onGoConnect }) {
   const [error, setError] = useState(null);
   const [elapsed, setElapsed] = useState(0);
   const [severityFilter, setSeverityFilter] = useState(null);
+  // Phase 5.3.2 — Findings | Rules | Methodology tabs.
+  const [activeTab, setActiveTab] = useState("findings");
   const startedAtRef = useRef(Date.now());
 
   useEffect(() => {
@@ -179,16 +201,152 @@ export default function Results({ auditId, onGoConnect }) {
         setSeverityFilter={setSeverityFilter}
       />
 
-      <FindingsList findings={visibleFindings || []} />
+      <TabBar active={activeTab} onChange={setActiveTab} />
 
-      <WebACLPanel webAcls={run.web_acls || []} />
-
-      <RuleBrowser rules={rules || []} flaggedMap={findingNamesByType} />
-
-      {run.estimated_waste_breakdown && run.estimated_waste_breakdown.length > 0 && (
-        <WasteBreakdown breakdown={run.estimated_waste_breakdown} total={run.estimated_waste_usd} />
+      {activeTab === "findings" && (
+        <>
+          <FindingsList findings={visibleFindings || []} />
+          <WebACLPanel webAcls={run.web_acls || []} />
+          {run.estimated_waste_breakdown && run.estimated_waste_breakdown.length > 0 && (
+            <WasteBreakdown breakdown={run.estimated_waste_breakdown} total={run.estimated_waste_usd} />
+          )}
+        </>
       )}
+
+      {activeTab === "rules" && (
+        <RuleBrowser rules={rules || []} flaggedMap={findingNamesByType} />
+      )}
+
+      {activeTab === "methodology" && <MethodologyTab />}
     </div>
+  );
+}
+
+function TabBar({ active, onChange }) {
+  const tabs = [
+    { id: "findings", label: "Findings" },
+    { id: "rules", label: "Rules" },
+    { id: "methodology", label: "Methodology" },
+  ];
+  return (
+    <div className="flex gap-1 border-b border-slate-200" role="tablist">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          role="tab"
+          data-testid={`tab-${t.id}`}
+          aria-selected={active === t.id}
+          onClick={() => onChange(t.id)}
+          className={
+            "px-4 py-2 text-sm font-medium border-b-2 -mb-px transition " +
+            (active === t.id
+              ? "border-slate-900 text-slate-900"
+              : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300")
+          }
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function MethodologyTab() {
+  return (
+    <section
+      data-testid="methodology-content"
+      className="rounded-xl border border-slate-200 bg-white p-6 space-y-6 text-sm text-slate-700"
+    >
+      <div data-testid="methodology-severity">
+        <h3 className="text-base font-semibold text-slate-900">Severity levels</h3>
+        <ul className="mt-2 space-y-1.5">
+          <li>
+            <b>HIGH</b> — Direct evidence of attack-shaped traffic reaching origin,
+            OR a dead / misconfigured rule whose stated purpose maps to an active
+            attack signature in this account's logs. Treat as urgent.
+          </li>
+          <li>
+            <b>MEDIUM</b> — Configured protection is not engaging as designed
+            (dead custom rule, dead managed group, count-mode with hits). No
+            direct evidence of active exploitation in this audit window.
+          </li>
+          <li>
+            <b>LOW</b> — Operational hygiene. No security exposure, but creates
+            audit noise, cost waste, or onboarding friction.
+          </li>
+        </ul>
+      </div>
+      <div data-testid="methodology-score">
+        <h3 className="text-base font-semibold text-slate-900">
+          Severity score (0–10)
+        </h3>
+        <p className="mt-2">
+          A numeric refinement inside each level. <b>HIGH = 7.0–10.0</b>,{" "}
+          <b>MEDIUM = 4.0–6.9</b>, <b>LOW = 0.1–3.9</b>. Computed deterministically
+          from finding type, presence of corroborating log evidence, rule kind
+          (managed vs custom), and (for bypasses) the CVE class of the matched
+          signature. Two findings of the same severity letter are sorted by score
+          descending in both UI and PDF.
+        </p>
+      </div>
+      <div data-testid="methodology-confidence">
+        <h3 className="text-base font-semibold text-slate-900">Confidence (0–100%)</h3>
+        <p className="mt-2">
+          How sure RuleIQ is that this finding is real, not a false positive.
+        </p>
+        <ul className="mt-2 space-y-1.5">
+          <li>
+            <b>90–100%</b> — structural — derived directly from AWS configuration
+            (e.g., a Web ACL with zero <i>ListResourcesForWebACL</i> results is
+            unambiguously orphaned).
+          </li>
+          <li>
+            <b>75–89%</b> — log-sample — derived from CloudWatch traffic plus rule
+            definitions (e.g., bypass detection from observed ALLOW'd attack-shaped
+            requests).
+          </li>
+          <li>
+            <b>Below 75%</b> — heuristic — derived from AI inference over rule
+            purpose. Treat as a starting point for human review, not as ground
+            truth.
+          </li>
+        </ul>
+      </div>
+      <div data-testid="methodology-evidence">
+        <h3 className="text-base font-semibold text-slate-900">Evidence types</h3>
+        <ul className="mt-2 space-y-1.5">
+          <li>
+            <b>configuration</b> — pulled directly from{" "}
+            <i>wafv2:GetWebACL</i>, <i>ListResourcesForWebACL</i>, etc.
+          </li>
+          <li>
+            <b>log-sample</b> — derived from CloudWatch log inspection over the
+            30-day window.
+          </li>
+          <li>
+            <b>ai-inference</b> — derived from GPT-4o reasoning over rule JSON +
+            statistics. Lowest weight.
+          </li>
+        </ul>
+      </div>
+      <div data-testid="methodology-not">
+        <h3 className="text-base font-semibold text-slate-900">
+          What RuleIQ does NOT do
+        </h3>
+        <ul className="mt-2 space-y-1.5">
+          <li>Does not write or modify any rule in your account.</li>
+          <li>
+            Does not store AWS keys — uses STS AssumeRole each run, session tokens
+            only.
+          </li>
+          <li>
+            Does not generate new WAF rules. All Suggested Actions point at
+            existing AWS-managed rule groups or human configuration changes.
+          </li>
+        </ul>
+      </div>
+    </section>
   );
 }
 
@@ -392,7 +550,7 @@ function FindingCard({ f }) {
   const disclaimer =
     f.disclaimer || (f.remediation && f.remediation.disclaimer) || "";
   const hasRemediation =
-    (suggestedActions && suggestedActions.length > 0) || verifyBy || disclaimer;
+    (suggestedActions && suggestedActions.length > 0) || verifyBy || disclaimer || f.impact;
   return (
     <article
       data-testid="finding-card"
@@ -401,15 +559,38 @@ function FindingCard({ f }) {
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span
-            data-testid="severity-badge"
-            className={`rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${sev}`}
+          <Tooltip
+            text={
+              f.severity === "high"
+                ? "HIGH — direct attack-shaped traffic reached origin, OR a dead/misconfigured rule maps to an active signature in your logs. Treat as urgent."
+                : f.severity === "medium"
+                  ? "MEDIUM — protection isn't engaging as designed (dead rule, count-mode with hits). No direct exploitation evidence in this window."
+                  : "LOW — operational hygiene. Audit noise, cost waste, or onboarding friction."
+            }
           >
-            {f.severity}
-          </span>
-          <span className="text-xs text-slate-500">
-            score {f.severity_score} · confidence {(f.confidence * 100).toFixed(0)}%
-          </span>
+            <span
+              data-testid="severity-badge"
+              className={`cursor-help rounded px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${sev}`}
+            >
+              {f.severity}
+            </span>
+          </Tooltip>
+          <Tooltip
+            text={
+              f.confidence >= 0.9
+                ? "Confidence ≥90% — structural, derived directly from AWS configuration. See Methodology tab."
+                : f.confidence >= 0.75
+                  ? "Confidence 75–89% — log-sample, derived from CloudWatch traffic + rule definitions. See Methodology tab."
+                  : "Confidence <75% — heuristic, derived from AI inference. Starting point for human review. See Methodology tab."
+            }
+          >
+            <span
+              data-testid="confidence-label"
+              className="cursor-help text-xs text-slate-500"
+            >
+              score {f.severity_score} · confidence {(f.confidence * 100).toFixed(0)}%
+            </span>
+          </Tooltip>
         </div>
         <span
           data-testid="type-pill"
@@ -466,6 +647,14 @@ function FindingCard({ f }) {
               data-testid="remediation-body"
               className="space-y-3 px-4 pb-4 text-sm text-slate-700"
             >
+              {f.impact && (
+                <div data-testid="impact-block">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Impact
+                  </div>
+                  <p className="mt-1">{f.impact}</p>
+                </div>
+              )}
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Suggested actions

@@ -328,7 +328,7 @@ def test_count_mode_findings_persist_through_run_audit_pipeline(monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "true")
 
     # No-op AI.
-    def fake_pipeline(rules, suspicious_requests=None):
+    def fake_pipeline(rules, suspicious_requests=None, **_kw):
         return {
             "rules": [
                 {**r, "ai_explanation": {"explanation": "m", "working": True, "concerns": None}}

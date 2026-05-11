@@ -123,7 +123,7 @@ def main():
 
     # Mock the LLM pipeline so we don't call OpenAI. We construct realistic
     # findings that exercise every section.
-    def fake_run_pipeline(rules, suspicious_requests=None):
+    def fake_run_pipeline(rules, suspicious_requests=None, **_kw):
         enriched = [
             {**r, "ai_explanation": {
                 "explanation": (
