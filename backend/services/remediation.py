@@ -438,3 +438,290 @@ def impact_for(
     else:
         key = ftype
     return _IMPACT_COPY.get(key, "")
+
+
+
+# ---------------------------------------------------------------------------
+# Feat #2 — Flavor B (smart, account-aware) remediation.
+# ---------------------------------------------------------------------------
+# We add a second layer ON TOP of the canned table above. The canned copy
+# is the universal fallback. The smart layer kicks in only for the four
+# highest-value finding types and only when the caller can supply enough
+# context (web_acls + rules_by_acl + suspicious sample).
+#
+# Output shape (when not None):
+#     {
+#         "suggested_actions": [str, ...],   # rewritten; overwrites canned
+#         "evidence_samples":  [str, ...],   # 0–3 sample URIs (bypass only)
+#     }
+# `verify_by`, `disclaimer`, `impact` are NOT touched by this layer.
+
+import re as _re  # noqa: E402  (intentional — extension lives at file end)
+
+
+_SIG_TO_GROUP: Dict[str, str] = {
+    "shellshock": "AWSManagedRulesUnixRuleSet",
+    "log4shell":  "AWSManagedRulesKnownBadInputsRuleSet",
+    "sqli":       "AWSManagedRulesSQLiRuleSet",
+    "xss":        "AWSManagedRulesCommonRuleSet",
+    "unix_cve":   "AWSManagedRulesUnixRuleSet",
+    "bot":        "AWSManagedRulesBotControlRuleSet",
+}
+
+_ORPHAN_TITLE_RE = _re.compile(r"Web ACL '([^']+)' is")
+
+
+def _next_priority_slot(acl_rules: List[Dict[str, Any]]) -> int:
+    """Smallest gap >=10 in the rule-priority sequence, else max+10."""
+    priorities = sorted(
+        int(r.get("priority") or 0) for r in acl_rules
+        if r.get("priority") is not None
+    )
+    if not priorities:
+        return 10
+    # First gap of at least 1 between consecutive priorities.
+    for prev, nxt in zip(priorities, priorities[1:]):
+        if nxt - prev >= 2:
+            return prev + 1
+    return priorities[-1] + 10
+
+
+def _has_count_override(rule: Dict[str, Any]) -> bool:
+    """True iff this rule (typically a managed group attachment) has a
+    sub-rule override that demotes it to COUNT."""
+    for ov in rule.get("managed_rule_overrides") or []:
+        if str(ov.get("action") or "").upper() == "COUNT":
+            return True
+    return False
+
+
+def _suspicious_for_sig(
+    suspicious_sample: List[Dict[str, Any]],
+    sig: str,
+) -> List[Dict[str, Any]]:
+    """Subset of suspicious requests whose `_signature_classes` includes
+    the given class. Tolerant of the field being missing — older audit
+    runs may have stored only `_suspicion_score`."""
+    out: List[Dict[str, Any]] = []
+    for r in suspicious_sample or []:
+        classes = r.get("_signature_classes") or []
+        if sig in classes:
+            out.append(r)
+    return out
+
+
+def _evidence_uris(suspicious: List[Dict[str, Any]], limit: int = 3) -> List[str]:
+    """Up to `limit` sample URIs (with query string) from a list of
+    suspicious requests. Keeps them readable in the PDF — we don't decode
+    URL-encoding here on purpose so reviewers see what actually hit the
+    origin."""
+    uris: List[str] = []
+    for r in suspicious[:limit]:
+        req = r.get("httpRequest") or {}
+        uri = req.get("uri") or ""
+        args = req.get("args") or ""
+        full = f"{uri}?{args}" if args else uri
+        if full and full not in uris:
+            uris.append(full)
+    return uris
+
+
+def _smart_bypass(
+    finding: Dict[str, Any],
+    rules_by_acl: Dict[str, List[Dict[str, Any]]],
+    suspicious_sample: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    sig = finding.get("signature_class")
+    target_group = _SIG_TO_GROUP.get(sig or "")
+    if not target_group:
+        return None  # unknown signature class — fall back to canned
+    affected = finding.get("affected_rules") or []
+    if not affected:
+        return None
+    acl_name = affected[0]
+    acl_rules = rules_by_acl.get(acl_name) or []
+    matching = _suspicious_for_sig(suspicious_sample, sig)
+    n_observed = len(matching)
+
+    # Existing managed-group attachment (if any) with this VendorName/Name.
+    existing = None
+    for r in acl_rules:
+        if (r.get("rule_kind") or "") != "managed":
+            continue
+        if r.get("rule_name") == target_group:
+            existing = r
+            break
+
+    if existing is None:
+        slot = _next_priority_slot(acl_rules)
+        n_text = (
+            f"{n_observed} attack-shaped request"
+            f"{'s' if n_observed != 1 else ''} matched this signature class "
+            "in the last 30 days. "
+        ) if n_observed else ""
+        action = (
+            f"Add {target_group} at priority {slot} to {acl_name}. "
+            f"{n_text}"
+            f"Console: WAFv2 → Web ACLs → {acl_name} → Rules → "
+            f"Add managed rule group → {target_group} → set priority {slot} → "
+            f"Save."
+        )
+    elif (str(existing.get("action") or "").upper() == "COUNT"
+          or _has_count_override(existing)):
+        action = (
+            f"{target_group} is present on {acl_name} but in COUNT mode. "
+            f"Promote to BLOCK after a 7-day false-positive review. "
+            f"Console: WAFv2 → Web ACLs → {acl_name} → Rules → "
+            f"Edit {target_group} → Override action to none / BLOCK → Save."
+        )
+    else:
+        prio = existing.get("priority")
+        action = (
+            f"Investigate why {target_group} (already attached at priority "
+            f"{prio} on {acl_name}) did not match. Likely cause: a "
+            f"higher-priority allow rule before it. "
+            f"Console: WAFv2 → Web ACLs → {acl_name} → Rules → review "
+            f"priorities < {prio}."
+        )
+    return {
+        "suggested_actions": [action],
+        "evidence_samples": _evidence_uris(matching),
+    }
+
+
+def _smart_count_mode(
+    finding: Dict[str, Any],
+    rules_by_name: Dict[str, Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    affected = finding.get("affected_rules") or []
+    if not affected:
+        return None
+    rule = (rules_by_name or {}).get(affected[0])
+    if not rule:
+        return None
+    acl_name = rule.get("web_acl_name") or "the affected Web ACL"
+    rule_name = rule.get("rule_name") or affected[0]
+    hits = int(rule.get("hit_count") or rule.get("count_mode_hits") or 0)
+    action = (
+        f"Promote {rule_name} from COUNT to BLOCK on {acl_name} "
+        f"(hit_count={hits:,} over 30d). False-positive review: inspect the "
+        f"last 100 matched samples in CloudWatch before promotion. "
+        f"Console: WAFv2 → Web ACLs → {acl_name} → Rules → Edit {rule_name} "
+        f"→ Action: BLOCK → Save."
+    )
+    return {"suggested_actions": [action], "evidence_samples": []}
+
+
+def _smart_dead_rule(
+    finding: Dict[str, Any],
+    rules_by_name: Dict[str, Dict[str, Any]],
+    suspicious_sample: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    # Lazy import — keeps signature_class out of the import graph for the
+    # canned-only callers (tests, build_demo_fixture).
+    from services import signature_class as _sigcls  # noqa: PLC0415
+
+    affected = finding.get("affected_rules") or []
+    if not affected:
+        return None
+    rule = (rules_by_name or {}).get(affected[0])
+    if not rule:
+        return None
+    intent = _sigcls.classify_rule_intent(
+        rule.get("statement_json"), rule.get("rule_name") or "",
+    )
+    if not intent:
+        return None
+    observed = _suspicious_for_sig(suspicious_sample, intent)
+    if not observed:
+        # Intent known but no live evidence — canned copy is more honest.
+        return None
+    acl_name = rule.get("web_acl_name") or "the affected Web ACL"
+    n = len(observed)
+    action = (
+        f"Rule {rule['rule_name']} on {acl_name} appears intended to block "
+        f"{intent} but has zero hits. Meanwhile {n} {intent}-shaped "
+        f"request{'s' if n != 1 else ''} reached origin in this audit. "
+        f"Either the rule's match statement is broken (likely a field-name "
+        f"or encoding mismatch — audit the rule definition) OR the rule is "
+        f"on the wrong Web ACL. Console: WAFv2 → Web ACLs → {acl_name} → "
+        f"Rules → Edit {rule['rule_name']} → review Statement JSON."
+    )
+    return {
+        "suggested_actions": [action],
+        "evidence_samples": _evidence_uris(observed),
+    }
+
+
+def _smart_orphan(
+    finding: Dict[str, Any],
+    rules_by_name: Dict[str, Dict[str, Any]],
+    rules_by_acl: Dict[str, List[Dict[str, Any]]],
+    web_acls: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    # Find ACL name. Affected rules are the inert rule names; first one's
+    # `web_acl_name` is the orphan. Fall back to parsing the title.
+    acl_name: Optional[str] = None
+    affected = finding.get("affected_rules") or []
+    if affected:
+        first = (rules_by_name or {}).get(affected[0])
+        if first:
+            acl_name = first.get("web_acl_name")
+    if not acl_name:
+        m = _ORPHAN_TITLE_RE.search(finding.get("title") or "")
+        if m:
+            acl_name = m.group(1)
+    if not acl_name:
+        return None
+    acl = next(
+        (a for a in web_acls or [] if a.get("name") == acl_name), None,
+    )
+    scope = (acl or {}).get("scope") or "REGIONAL"
+    inert_count = len(rules_by_acl.get(acl_name) or affected)
+    action = (
+        f"Web ACL {acl_name} (scope: {scope}) has no attached resources. "
+        f"{inert_count} rule{'s' if inert_count != 1 else ''} inside "
+        f"{'are' if inert_count != 1 else 'is'} inert by definition. Either "
+        f"attach to a resource OR delete to stop the $5/mo fee. Console: "
+        f"WAFv2 → Web ACLs → {acl_name} → Associated AWS resources → Add "
+        f"(or top-right Delete)."
+    )
+    return {"suggested_actions": [action], "evidence_samples": []}
+
+
+def smart_remediation_for(
+    finding: Dict[str, Any],
+    rules_by_name: Optional[Dict[str, Dict[str, Any]]] = None,
+    rules_by_acl: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    web_acls: Optional[List[Dict[str, Any]]] = None,
+    suspicious_sample: Optional[List[Dict[str, Any]]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Feat #2 — return account-aware remediation for a finding, or None.
+
+    Returning None means "fall back to the canned `remediation_for` copy".
+
+    Supported finding types:
+      * `bypass_candidate`
+      * `count_mode_with_hits` / `count_mode_high_volume` /
+        `count_mode_long_duration`
+      * `dead_rule` (only when log-sample correlation is present)
+      * `orphaned_web_acl`
+
+    All other types intentionally return None — Flavor B is explicitly
+    scoped to the four highest-value cases per Issue #2.
+    """
+    rules_by_name = rules_by_name or {}
+    rules_by_acl = rules_by_acl or {}
+    web_acls = web_acls or []
+    suspicious_sample = suspicious_sample or []
+    ftype = finding.get("type") or ""
+    if ftype == "bypass_candidate":
+        return _smart_bypass(finding, rules_by_acl, suspicious_sample)
+    if ftype in {"count_mode_with_hits", "count_mode_high_volume",
+                  "count_mode_long_duration"}:
+        return _smart_count_mode(finding, rules_by_name)
+    if ftype == "dead_rule":
+        return _smart_dead_rule(finding, rules_by_name, suspicious_sample)
+    if ftype == "orphaned_web_acl":
+        return _smart_orphan(finding, rules_by_name, rules_by_acl, web_acls)
+    return None
