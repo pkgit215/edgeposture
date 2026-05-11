@@ -1,8 +1,6 @@
 # RuleIQ
 
-> **🔗 Live demo:** https://d96qfmakzi.us-east-1.awsapprunner.com
->
-> Paste a 12-digit AWS Account ID (any valid format) to see the IAM role template and walkthrough. To run a real audit, follow the Setup section to create the read-only IAM role in your own AWS account.
+> **🔗 Live demo:** https://d96qfmakzi.us-east-1.awsapprunner.com/demo — see a sample audit without setting up AWS. To run an audit against your own account, click "Set up an audit" on the demo page.
 
 AI-powered AWS WAF audit tool. Two-pass LLM pipeline that explains every WAF rule and surfaces dead rules, potential bypasses, conflicts, quick wins, and FMS-managed review items — without ever recommending changes the customer cannot make.
 

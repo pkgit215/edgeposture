@@ -44,7 +44,7 @@ function Tooltip({ text, children }) {
   );
 }
 
-export default function Results({ auditId, onGoConnect }) {
+export default function Results({ auditId, onGoConnect, demoMode = false }) {
   const [run, setRun] = useState(null);
   const [rules, setRules] = useState(null);
   const [findings, setFindings] = useState(null);
@@ -73,6 +73,19 @@ export default function Results({ auditId, onGoConnect }) {
 
     const tick = async () => {
       try {
+        // Issue #22 — demo mode reads the combined fixture from a single
+        // public endpoint, no role-assume polling required.
+        if (demoMode) {
+          const resp = await fetch("/api/demo/audit");
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          if (cancelled) return;
+          setRun({ ...data.audit, status: "complete" });
+          setRules(data.rules || []);
+          setFindings(data.findings || []);
+          clearInterval(intervalId);
+          return;
+        }
         const r = await api.getAudit(auditId);
         if (cancelled) return;
         setRun(r);
@@ -135,7 +148,7 @@ export default function Results({ auditId, onGoConnect }) {
   if (!run || run.status === "pending" || run.status === "running") {
     return (
       <div className="space-y-6">
-        <ResultsHeader auditId={auditId} run={run} />
+        <ResultsHeader auditId={auditId} run={run} demoMode={demoMode} />
         <div
           data-testid="results-progress"
           className="rounded-xl border border-slate-200 bg-white p-12 text-center"
@@ -190,7 +203,7 @@ export default function Results({ auditId, onGoConnect }) {
 
   return (
     <div className="space-y-8">
-      <ResultsHeader auditId={auditId} run={run} />
+      <ResultsHeader auditId={auditId} run={run} demoMode={demoMode} />
       <HeadlinePanel
         run={run}
         rulesCount={rules?.length || 0}
@@ -350,10 +363,12 @@ function MethodologyTab() {
   );
 }
 
-function ResultsHeader({ auditId, run }) {
+function ResultsHeader({ auditId, run, demoMode = false }) {
   const status = run?.status || "pending";
   const isComplete = status === "complete";
-  const downloadUrl = `/api/audits/${auditId}/report.pdf`;
+  const downloadUrl = demoMode
+    ? "/api/demo/report.pdf"
+    : `/api/audits/${auditId}/report.pdf`;
   const onDownload = () => {
     if (!isComplete) return;
     window.location.href = downloadUrl;
