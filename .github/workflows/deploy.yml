@@ -13,13 +13,13 @@ env:
   AWS_REGION: us-east-1
   # Configure as a repo variable: Settings → Secrets and variables →
   # Actions → Variables → AWS_ACCOUNT_ID. Fork-safe and scrubbed of PII.
-  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   ECR_REPO: ruleiq
   APP_RUNNER_SERVICE: ruleiq
-  INSTANCE_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ruleiq-apprunner-instance
-  ACCESS_ROLE_ARN: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ruleiq-apprunner-ecr-access
-  PUBLIC_TEMPLATES_BUCKET: ruleiq-public-templates-${{ vars.AWS_ACCOUNT_ID }}
-  EXTERNAL_ID_SECRET_ARN: arn:aws:secretsmanager:us-east-1:${{ vars.AWS_ACCOUNT_ID }}:secret:ruleiq/external-id-secret
+  INSTANCE_ROLE_ARN: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ruleiq-apprunner-instance
+  ACCESS_ROLE_ARN: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ruleiq-apprunner-ecr-access
+  PUBLIC_TEMPLATES_BUCKET: ruleiq-public-templates-${{ secrets.AWS_ACCOUNT_ID }}
+  EXTERNAL_ID_SECRET_ARN: arn:aws:secretsmanager:us-east-1:${{ secrets.AWS_ACCOUNT_ID }}:secret:ruleiq/external-id-secret
 
 jobs:
   deploy:
@@ -31,7 +31,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/ruleiq-github-deployer
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ruleiq-github-deployer
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
