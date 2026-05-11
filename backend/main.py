@@ -6,6 +6,7 @@ Phase 1 endpoints kept; new Phase 2 surface:
 """
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import os
@@ -434,6 +435,43 @@ def get_account(account_id: str) -> Dict[str, Any]:
     if not doc:
         raise HTTPException(status_code=404, detail="account not found")
     return _serialize_account(doc)
+
+
+# --- Issue #22 — public demo fixture ---------------------------------------
+
+_DEMO_FIXTURE_DIR = Path(__file__).resolve().parent / "demo"
+
+
+@functools.lru_cache(maxsize=1)
+def _load_demo_audit() -> Dict[str, Any]:
+    """Load + cache the committed demo fixture JSON."""
+    p = _DEMO_FIXTURE_DIR / "demo_audit.json"
+    if not p.exists():
+        raise HTTPException(status_code=503, detail="demo fixture not present")
+    return json.loads(p.read_text())
+
+
+@app.get("/api/demo/audit")
+def get_demo_audit() -> Dict[str, Any]:
+    """Pre-canned demo audit — combined `{audit, rules, findings}` payload.
+    Public, no auth, no role assumption. Source: backend/demo/demo_audit.json."""
+    return _load_demo_audit()
+
+
+@app.get("/api/demo/report.pdf")
+def get_demo_report_pdf() -> Response:
+    """Pre-rendered demo PDF served as static bytes."""
+    p = _DEMO_FIXTURE_DIR / "demo_audit.pdf"
+    if not p.exists():
+        raise HTTPException(status_code=503, detail="demo PDF not present")
+    return Response(
+        content=p.read_bytes(),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'inline; filename="ruleiq-demo-audit.pdf"',
+        },
+    )
+
 
 
 @app.get("/api/audits")

@@ -1,10 +1,21 @@
 # RuleIQ — Live Demo
 
-**🔗 Live demo:** https://d96qfmakzi.us-east-1.awsapprunner.com
+**🔗 Live sample audit (no AWS setup):** https://d96qfmakzi.us-east-1.awsapprunner.com/demo
 
-## 3-step quickstart
+**🔗 Run against your own AWS account:** https://d96qfmakzi.us-east-1.awsapprunner.com
 
-1. **Visit the demo URL above.**
+## See a sample audit in 10 seconds
+
+Open the `/demo` URL above. It renders a fully-populated audit using a
+committed fixture — every finding type (`bypass_candidate`, `dead_rule`,
+`conflict`, `quick_win`, `fms_review`), every Remediation block, the
+Methodology tab, and a downloadable PDF report. No IAM role required.
+Click "Set up an audit →" on the banner to graduate to a real audit
+against your own account.
+
+## 3-step quickstart (real audit)
+
+1. **Visit the root URL above** (no `/demo`).
 2. **Paste your AWS Account ID** (12 digits, any valid format).
 3. **Follow the displayed instructions** to create the read-only IAM role
    in your AWS account, paste the Role ARN back into the form, and click
