@@ -112,3 +112,55 @@ def test_demo_findings_carry_remediation_blocks():
         assert (f.get("suggested_actions") or []), (
             f"finding {f['type']} missing suggested_actions"
         )
+
+
+# --- Fix #22 — Rules-tab parity with real audit -----------------------------
+
+
+def test_demo_rules_field_lives_at_top_level_like_real_audit():
+    """Bug Fix #22 — the Results-page Rules tab reads from `data.rules`
+    (NOT `data.audit.rules`). The demo payload must therefore mirror the
+    real audit's shape: rules array at the top-level envelope."""
+    body = client.get("/api/demo/audit").json()
+    assert "rules" in body and isinstance(body["rules"], list)
+    assert len(body["rules"]) == 52
+    # Real audits never nest rules under `audit`. Demo must match.
+    assert "rules" not in body["audit"]
+
+
+def test_demo_rule_shape_matches_real_audit_persistence():
+    """Bug Fix #22 — `ai_explanation` is persisted as a STRING by the real
+    audit pipeline (services/audit.py flattens the AI dict before write).
+    The demo fixture must use the same shape — otherwise React tries to
+    render an object as a child and crashes the Rules tab with error #31.
+
+    Each rule must also carry the fields the Rules-tab UI reads:
+    rule_name, web_acl_name, action, hit_count, last_fired, rule_kind,
+    statement_json, fms_managed.
+    """
+    body = client.get("/api/demo/audit").json()
+    required = {"rule_name", "web_acl_name", "action", "hit_count",
+                "last_fired", "rule_kind", "statement_json", "fms_managed"}
+    for r in body["rules"]:
+        missing = required - set(r.keys())
+        assert not missing, f"rule {r.get('rule_name')!r} missing {missing}"
+        assert isinstance(r["ai_explanation"], str), (
+            f"rule {r['rule_name']!r} ai_explanation is "
+            f"{type(r['ai_explanation']).__name__}, not str — will crash "
+            f"React with minified error #31"
+        )
+        # `hit_count` must be a number (rendered as `.toLocaleString()` in JSX).
+        assert isinstance(r["hit_count"], (int, float))
+        # `last_fired` is either ISO string or null.
+        assert r["last_fired"] is None or isinstance(r["last_fired"], str)
+
+
+def test_demo_rules_cover_all_four_web_acls():
+    """The demo Rules tab is only useful if every Web ACL is represented.
+    Catches regressions where one ACL is silently dropped from the
+    fixture build."""
+    body = client.get("/api/demo/audit").json()
+    expected = {"prod-cf-edge-acl", "api-gateway-protect",
+                "internal-alb-waf", "legacy-edge-acl"}
+    seen = {r["web_acl_name"] for r in body["rules"]}
+    assert seen == expected, f"missing ACLs: {expected - seen}"

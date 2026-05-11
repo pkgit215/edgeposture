@@ -331,11 +331,11 @@ def _build_rule(
         "sample_uris": sample_uris,
         "fms_managed": fms, "override_action": None,
         "managed_rule_overrides": overrides,
-        "ai_explanation": {
-            "explanation": _ai_blurb_for(name, kind, hits),
-            "working": hits > 0 if days_since is not None else False,
-            "concerns": None,
-        },
+        # Match the production audit-persistence shape: `ai_explanation` is
+        # the explanation STRING, not the full {explanation,working,concerns}
+        # dict that the AI pass returns. Services/audit.py:838 does the same
+        # flattening before persisting to MongoDB.
+        "ai_explanation": _ai_blurb_for(name, kind, hits),
     }
 
 

@@ -331,11 +331,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesCommonRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesCommonRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "AWSManagedRulesKnownBadInputsRuleSet",
@@ -358,11 +354,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesKnownBadInputsRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesKnownBadInputsRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "AWSManagedRulesSQLiRuleSet",
@@ -385,11 +377,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesSQLiRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesSQLiRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "AWSManagedRulesAmazonIpReputationList",
@@ -412,11 +400,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesAmazonIpReputationList'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesAmazonIpReputationList'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "AWSManagedRulesAnonymousIpList",
@@ -439,11 +423,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesAnonymousIpList'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesAnonymousIpList'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "AWSManagedRulesLinuxRuleSet",
@@ -466,11 +446,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesLinuxRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesLinuxRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "BlockBadIPs",
@@ -501,11 +477,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockBadIPs'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockBadIPs'. Active during the window."
     },
     {
       "rule_name": "RateLimitGlobal",
@@ -542,11 +514,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 2,974 hits.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 2,974 hits."
     },
     {
       "rule_name": "BlockAdminPath",
@@ -582,11 +550,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockAdminPath'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockAdminPath'. Active during the window."
     },
     {
       "rule_name": "BlockOldUserAgents",
@@ -617,11 +581,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockOldUserAgents'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockOldUserAgents'. Active during the window."
     },
     {
       "rule_name": "RateLimit-PerIP-Login",
@@ -658,11 +618,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 1,453 hits.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 1,453 hits."
     },
     {
       "rule_name": "RateLimit-PerIP-Checkout",
@@ -699,11 +655,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 874 hits.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 874 hits."
     },
     {
       "rule_name": "RateLimit-PerIP",
@@ -740,11 +692,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 642 hits.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 642 hits."
     },
     {
       "rule_name": "RateLimit-PerIP-Duplicate",
@@ -781,11 +729,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 638 hits.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 638 hits."
     },
     {
       "rule_name": "BlockDirectoryTraversal",
@@ -819,11 +763,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockDirectoryTraversal'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockDirectoryTraversal'. Active during the window."
     },
     {
       "rule_name": "BlockSensitiveFiles",
@@ -858,11 +798,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockSensitiveFiles'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockSensitiveFiles'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "GeoBlockSanctioned",
@@ -893,11 +829,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'GeoBlockSanctioned'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'GeoBlockSanctioned'. Active during the window."
     },
     {
       "rule_name": "AllowedHealthChecks",
@@ -928,11 +860,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'AllowedHealthChecks'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'AllowedHealthChecks'. Active during the window."
     },
     {
       "rule_name": "AWSManagedRulesCommonRuleSet",
@@ -955,11 +883,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesCommonRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesCommonRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "AWSManagedRulesKnownBadInputsRuleSet",
@@ -982,11 +906,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesKnownBadInputsRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesKnownBadInputsRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "AWSManagedRulesSQLiRuleSet",
@@ -1022,11 +942,7 @@
           "action": "COUNT"
         }
       ],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesSQLiRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesSQLiRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "AWSManagedRulesAmazonIpReputationList",
@@ -1049,11 +965,7 @@
       "fms_managed": true,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesAmazonIpReputationList'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesAmazonIpReputationList'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group."
     },
     {
       "rule_name": "AWSManagedRulesBotControlRuleSet",
@@ -1076,11 +988,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesBotControlRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesBotControlRuleSet'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "RateLimit-PerAPIKey",
@@ -1117,11 +1025,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 5,234 hits.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 5,234 hits."
     },
     {
       "rule_name": "BlockMaliciousIPRange",
@@ -1152,11 +1056,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockMaliciousIPRange'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockMaliciousIPRange'. Active during the window."
     },
     {
       "rule_name": "AllowPartnerIPs",
@@ -1187,11 +1087,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'AllowPartnerIPs'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'AllowPartnerIPs'. Active during the window."
     },
     {
       "rule_name": "RequireAuthHeader",
@@ -1222,11 +1118,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'RequireAuthHeader'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'RequireAuthHeader'. Active during the window."
     },
     {
       "rule_name": "BlockOldTLS",
@@ -1257,11 +1149,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockOldTLS'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockOldTLS'. Active during the window."
     },
     {
       "rule_name": "RateLimit-PerEndpoint",
@@ -1298,11 +1186,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 2,810 hits.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Rate-based rule limiting requests per source IP under the configured scope-down match. Active during the window with 2,810 hits."
     },
     {
       "rule_name": "BlockSuspiciousReferers",
@@ -1333,11 +1217,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockSuspiciousReferers'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockSuspiciousReferers'. Active during the window."
     },
     {
       "rule_name": "ValidateContentType",
@@ -1368,11 +1248,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'ValidateContentType'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'ValidateContentType'. Active during the window."
     },
     {
       "rule_name": "BlockSQLInjectionAttempt",
@@ -1405,11 +1281,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockSQLInjectionAttempt'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockSQLInjectionAttempt'. Active during the window."
     },
     {
       "rule_name": "BlockCommandInjection",
@@ -1440,11 +1312,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockCommandInjection'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockCommandInjection'. Active during the window."
     },
     {
       "rule_name": "BlockXSSPayload",
@@ -1477,11 +1345,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockXSSPayload'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockXSSPayload'. Active during the window."
     },
     {
       "rule_name": "AWSManagedRulesBotControlRuleSet",
@@ -1504,11 +1368,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesBotControlRuleSet'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesBotControlRuleSet'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group."
     },
     {
       "rule_name": "AWSManagedRulesAmazonIpReputationList",
@@ -1531,11 +1391,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesAmazonIpReputationList'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesAmazonIpReputationList'. Provides AWS-curated signature coverage; active \u2014 matched traffic during the window."
     },
     {
       "rule_name": "BlockOldChinaIPs",
@@ -1566,11 +1422,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockOldChinaIPs'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockOldChinaIPs'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "AllowInternalCIDR",
@@ -1601,11 +1453,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'AllowInternalCIDR'. Active during the window.",
-        "working": true,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'AllowInternalCIDR'. Active during the window."
     },
     {
       "rule_name": "AWSManagedRulesCommonRuleSet",
@@ -1628,11 +1476,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesCommonRuleSet'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesCommonRuleSet'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group."
     },
     {
       "rule_name": "AWSManagedRulesKnownBadInputsRuleSet",
@@ -1655,11 +1499,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "AWS-managed group 'AWSManagedRulesKnownBadInputsRuleSet'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "AWS-managed group 'AWSManagedRulesKnownBadInputsRuleSet'. Provides AWS-curated signature coverage; no matches in the window \u2014 verify traffic is actually reaching this group."
     },
     {
       "rule_name": "BlockOldCurlScanners",
@@ -1690,11 +1530,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockOldCurlScanners'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockOldCurlScanners'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "BlockTorExitNodes",
@@ -1725,11 +1561,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockTorExitNodes'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockTorExitNodes'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "BlockBitTorrent",
@@ -1760,11 +1592,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockBitTorrent'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockBitTorrent'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "BlockOldFlashClients",
@@ -1795,11 +1623,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockOldFlashClients'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockOldFlashClients'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "BlockJavaApplets",
@@ -1830,11 +1654,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockJavaApplets'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockJavaApplets'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "BlockOldIE",
@@ -1865,11 +1685,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockOldIE'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockOldIE'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "LegacyRateLimit",
@@ -1906,11 +1722,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Rate-based rule with zero hits \u2014 either traffic is below the threshold or the scope-down match never fires.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Rate-based rule with zero hits \u2014 either traffic is below the threshold or the scope-down match never fires."
     },
     {
       "rule_name": "BlockSpoofedReferers",
@@ -1941,11 +1753,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockSpoofedReferers'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockSpoofedReferers'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "OldGeoBlock",
@@ -1976,11 +1784,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'OldGeoBlock'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'OldGeoBlock'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "DeprecatedBotDetection",
@@ -2011,11 +1815,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'DeprecatedBotDetection'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'DeprecatedBotDetection'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "BlockHTTP09",
@@ -2046,11 +1846,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockHTTP09'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockHTTP09'. No matches in 30 days \u2014 review with the rule owner."
     },
     {
       "rule_name": "BlockOldSSL",
@@ -2081,11 +1877,7 @@
       "fms_managed": false,
       "override_action": null,
       "managed_rule_overrides": [],
-      "ai_explanation": {
-        "explanation": "Custom rule 'BlockOldSSL'. No matches in 30 days \u2014 review with the rule owner.",
-        "working": false,
-        "concerns": null
-      }
+      "ai_explanation": "Custom rule 'BlockOldSSL'. No matches in 30 days \u2014 review with the rule owner."
     }
   ],
   "findings": [
