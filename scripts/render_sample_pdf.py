@@ -34,7 +34,7 @@ def _ts(days_ago: int = 0, hours_ago: int = 0) -> str:
 
 AUDIT_RUN = {
     "_id": "phase5sample00000000000000000001",
-    "account_id": "371126261144",  # real account — not masked per user request
+    "account_id": "123456789012",  # real account — not masked per user request
     "region": "us-east-1",
     "status": "complete",
     "created_at": NOW - timedelta(minutes=12),
@@ -68,16 +68,16 @@ AUDIT_RUN = {
         {
             "name": "prod-api-acl",
             "scope": "REGIONAL",
-            "arn": "arn:aws:wafv2:us-east-1:371126261144:regional/webacl/prod-api-acl/abc-123",
+            "arn": "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/prod-api-acl/abc-123",
             "attached_resources": [
-                "arn:aws:elasticloadbalancing:us-east-1:371126261144:loadbalancer/app/prod-api/xyz",
+                "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/prod-api/xyz",
             ],
             "attached": True,
         },
         {
             "name": "legacy-marketing-acl",
             "scope": "REGIONAL",
-            "arn": "arn:aws:wafv2:us-east-1:371126261144:regional/webacl/legacy-marketing-acl/def-456",
+            "arn": "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/legacy-marketing-acl/def-456",
             "attached_resources": [],
             "attached": False,
         },

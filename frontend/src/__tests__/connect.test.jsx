@@ -5,7 +5,7 @@ import Connect from "../views/Connect.jsx";
 
 // Setup-info response when account_id is NOT supplied (Step 0).
 const SETUP_BASE = {
-  app_runner_account_id: "371126261144",
+  app_runner_account_id: "123456789012",
   cfn_template_url: "https://example.com/customer-role.yaml",
   inline_iam_json: { Version: "2012-10-17", Statement: [] },
   account_id: null,

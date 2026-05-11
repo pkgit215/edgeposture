@@ -9,7 +9,7 @@ Description: >
 Parameters:
   RuleIQTrustedAccount:
     Type: String
-    Default: "371126261144"
+    Default: "123456789012"
     AllowedPattern: "^[0-9]{12}$"
     Description: >
       The AWS account ID that hosts the RuleIQ App Runner service.

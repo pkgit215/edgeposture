@@ -195,8 +195,8 @@ def main():
 
     audit_id = audit_mod.create_audit_run(
         db=db,
-        account_id="371126261144",
-        role_arn="arn:aws:iam::371126261144:role/ruleiq-audit",
+        account_id="123456789012",
+        role_arn="arn:aws:iam::123456789012:role/ruleiq-audit",
         region="us-east-1",
         log_window_days=30,
         external_id="x" * 64,

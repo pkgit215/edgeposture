@@ -38,7 +38,7 @@ body:
     id: affected_resource
     attributes:
       label: Affected resource
-      description: "ARN, friendly name, or short identifier. Example: `aitrading.ninja` / `arn:aws:cloudfront::...`"
+      description: "ARN, friendly name, or short identifier. Example: `example.com` / `arn:aws:cloudfront::...`"
     validations:
       required: true
 

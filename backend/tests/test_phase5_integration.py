@@ -49,10 +49,10 @@ import main  # noqa: E402
 
 # --- Real-shape AWS fixtures (sanitised from real boto3 responses) ---------
 
-REGIONAL_ACL_ARN = "arn:aws:wafv2:us-east-1:371126261144:regional/webacl/ruleiq-test-acl/abc-123"
-CLOUDFRONT_ACL_ARN = "arn:aws:wafv2:us-east-1:371126261144:global/webacl/ruleiq-cf-acl/def-456"
-ALB_ARN = "arn:aws:elasticloadbalancing:us-east-1:371126261144:loadbalancer/app/ruleiq-test-alb/abc"
-LOG_GROUP_ARN = "arn:aws:logs:us-east-1:371126261144:log-group:aws-waf-logs-ruleiq-cf-test:*"
+REGIONAL_ACL_ARN = "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/ruleiq-test-acl/abc-123"
+CLOUDFRONT_ACL_ARN = "arn:aws:wafv2:us-east-1:123456789012:global/webacl/ruleiq-cf-acl/def-456"
+ALB_ARN = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/ruleiq-test-alb/abc"
+LOG_GROUP_ARN = "arn:aws:logs:us-east-1:123456789012:log-group:aws-waf-logs-ruleiq-cf-test:*"
 LOG_GROUP_NAME = "aws-waf-logs-ruleiq-cf-test"
 
 
@@ -182,7 +182,7 @@ def _shellshock_event() -> Dict[str, Any]:
                 "clientIp": "192.0.2.1",
                 "country": "RU",
                 "headers": [
-                    {"name": "host", "value": "aitrading.ninja"},
+                    {"name": "host", "value": "example.com"},
                     {"name": "user-agent", "value": '() { :;}; /bin/bash -c "echo hacked"'},
                     {"name": "accept", "value": "*/*"},
                 ],
@@ -212,7 +212,7 @@ def _url_encoded_xss_event() -> Dict[str, Any]:
                 "clientIp": "203.0.113.5",
                 "country": "US",
                 "headers": [
-                    {"name": "host", "value": "aitrading.ninja"},
+                    {"name": "host", "value": "example.com"},
                     {"name": "user-agent", "value": "Mozilla/5.0"},
                 ],
                 # PRODUCTION shape: URL-encoded.
@@ -242,7 +242,7 @@ def _benign_event() -> Dict[str, Any]:
                 "clientIp": "198.51.100.1",
                 "country": "US",
                 "headers": [
-                    {"name": "host", "value": "aitrading.ninja"},
+                    {"name": "host", "value": "example.com"},
                     {"name": "user-agent", "value": "Mozilla/5.0 (Macintosh)"},
                 ],
                 "uri": "/",
@@ -428,8 +428,8 @@ def test_derive_mode_propagates_to_persisted_rule_doc(client, db, monkeypatch):
         mock_session=sess,
     )
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144",
-        role_arn="arn:aws:iam::371126261144:role/ruleiq-audit",
+        db=db, account_id="123456789012",
+        role_arn="arn:aws:iam::123456789012:role/ruleiq-audit",
         region="us-east-1", log_window_days=30, external_id="x" * 64,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -454,8 +454,8 @@ def test_orphan_acl_emits_finding_and_suppresses_dead_rules(client, db, monkeypa
         mock_session=sess,
     )
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144",
-        role_arn="arn:aws:iam::371126261144:role/ruleiq-audit",
+        db=db, account_id="123456789012",
+        role_arn="arn:aws:iam::123456789012:role/ruleiq-audit",
         region="us-east-1", log_window_days=30, external_id="x" * 64,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -488,8 +488,8 @@ def test_access_denied_does_not_produce_false_orphan(client, db, monkeypatch):
         mock_session=sess,
     )
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144",
-        role_arn="arn:aws:iam::371126261144:role/ruleiq-audit",
+        db=db, account_id="123456789012",
+        role_arn="arn:aws:iam::123456789012:role/ruleiq-audit",
         region="us-east-1", log_window_days=30, external_id="x" * 64,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -513,8 +513,8 @@ def test_cloudfront_empty_attachment_is_unknown_not_orphan(client, db, monkeypat
         mock_session=sess,
     )
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144",
-        role_arn="arn:aws:iam::371126261144:role/ruleiq-audit",
+        db=db, account_id="123456789012",
+        role_arn="arn:aws:iam::123456789012:role/ruleiq-audit",
         region="us-east-1", log_window_days=30, external_id="x" * 64,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -553,8 +553,8 @@ def test_web_acls_populated_on_audit_run(client, db, monkeypatch):
         mock_session=sess,
     )
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144",
-        role_arn="arn:aws:iam::371126261144:role/ruleiq-audit",
+        db=db, account_id="123456789012",
+        role_arn="arn:aws:iam::123456789012:role/ruleiq-audit",
         region="us-east-1", log_window_days=30, external_id="x" * 64,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -592,8 +592,8 @@ def test_end_to_end_real_shape_log_event_produces_bypass_candidate(client, db, m
         mock_session=sess,
     )
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144",
-        role_arn="arn:aws:iam::371126261144:role/ruleiq-audit",
+        db=db, account_id="123456789012",
+        role_arn="arn:aws:iam::123456789012:role/ruleiq-audit",
         region="us-east-1", log_window_days=30, external_id="x" * 64,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -632,8 +632,8 @@ def test_scope_field_shows_both_when_both_scopes_present(client, db, monkeypatch
         mock_session=sess,
     )
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144",
-        role_arn="arn:aws:iam::371126261144:role/ruleiq-audit",
+        db=db, account_id="123456789012",
+        role_arn="arn:aws:iam::123456789012:role/ruleiq-audit",
         region="us-east-1", log_window_days=30, external_id="x" * 64,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -658,8 +658,8 @@ def test_pdf_renders_web_acl_section_against_real_shape_audit(client, db, monkey
         mock_session=sess,
     )
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144",
-        role_arn="arn:aws:iam::371126261144:role/ruleiq-audit",
+        db=db, account_id="123456789012",
+        role_arn="arn:aws:iam::123456789012:role/ruleiq-audit",
         region="us-east-1", log_window_days=30, external_id="x" * 64,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -717,7 +717,7 @@ class _CFAwareMockSession(_MockSession):
         return super().client(service, region_name=region_name)
 
 
-CF_DISTRO_ARN = "arn:aws:cloudfront::371126261144:distribution/EKOXAVPA9GX2R"
+CF_DISTRO_ARN = "arn:aws:cloudfront::123456789012:distribution/EKOXAVPA9GX2R"
 CF_DISTRO_ID = "EKOXAVPA9GX2R"
 
 
@@ -770,7 +770,7 @@ def test_scope_field_shows_both_when_both_scanned():
     import io
 
     audit_run = {
-        "_id": "x", "account_id": "371126261144",
+        "_id": "x", "account_id": "123456789012",
         "data_source": "aws", "rule_count": 0, "web_acl_count": 0,
         "estimated_waste_usd": 0.0, "estimated_waste_breakdown": [],
         "created_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc),
@@ -1016,7 +1016,7 @@ def test_friendly_name_lookup_for_cloudfront_alias():
     """Phase 5.2.2: CloudFront → alias from get_distribution Aliases."""
     sess = _FriendlyNameSession(cf_distros_get={
         CF_DISTRO_ID: {
-            "Aliases": {"Items": ["aitrading.ninja"], "Quantity": 1}
+            "Aliases": {"Items": ["example.com"], "Quantity": 1}
         }
     })
     out = aws_waf.enrich_resource_friendly_names(
@@ -1027,7 +1027,7 @@ def test_friendly_name_lookup_for_cloudfront_alias():
     assert len(out) == 1
     assert out[0]["type"] == "CLOUDFRONT"
     assert out[0]["id"] == CF_DISTRO_ID
-    assert out[0]["friendly"] == "aitrading.ninja"
+    assert out[0]["friendly"] == "example.com"
 
 
 def test_friendly_name_lookup_falls_back_to_domain_name_when_no_alias():
@@ -1117,14 +1117,14 @@ def test_reclassifier_processes_non_quick_win_finding_types(ftype):
 
 def test_pdf_renders_friendly_names_not_raw_arns():
     """Phase 5.2.2: the Web ACL section of the PDF prints the friendly
-    name (e.g. 'aitrading.ninja') instead of the raw distribution ARN."""
+    name (e.g. 'example.com') instead of the raw distribution ARN."""
     from services.pdf_report import render_audit_pdf
     from pypdf import PdfReader
     import io
     import datetime as _dt
 
     audit_run = {
-        "_id": "x", "account_id": "371126261144",
+        "_id": "x", "account_id": "123456789012",
         "data_source": "aws", "rule_count": 0, "web_acl_count": 1,
         "estimated_waste_usd": 0.0, "estimated_waste_breakdown": [],
         "created_at": _dt.datetime.now(_dt.timezone.utc),
@@ -1134,10 +1134,10 @@ def test_pdf_renders_friendly_names_not_raw_arns():
             "name": "ruleiq-cf-acl", "scope": "CLOUDFRONT", "attached": True,
             "attached_resources": [
                 {"arn": CF_DISTRO_ARN, "type": "CLOUDFRONT",
-                 "id": CF_DISTRO_ID, "friendly": "aitrading.ninja"}
+                 "id": CF_DISTRO_ID, "friendly": "example.com"}
             ],
         }],
     }
     pdf = render_audit_pdf(audit_run, [], [])
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf)).pages)
-    assert "aitrading.ninja" in text, "PDF must show friendly name"
+    assert "example.com" in text, "PDF must show friendly name"

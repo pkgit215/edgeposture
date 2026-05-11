@@ -118,7 +118,7 @@ def test_wire_up_attaches_flat_remediation_keys_to_every_finding(monkeypatch):
     monkeypatch.setattr(audit_mod.ai_pipeline, "run_pipeline", fake_pipeline)
 
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144", role_arn=None,
+        db=db, account_id="123456789012", role_arn=None,
         region="us-east-1", log_window_days=30, external_id=None,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -189,7 +189,7 @@ def test_bypass_affected_rules_backfilled_with_web_acl_names(monkeypatch):
     monkeypatch.setattr(audit_mod.ai_pipeline, "run_pipeline", fake_pipeline)
 
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144", role_arn=None,
+        db=db, account_id="123456789012", role_arn=None,
         region="us-east-1", log_window_days=30, external_id=None,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -238,7 +238,7 @@ def test_audit_run_timestamps_serialize_with_Z_suffix(monkeypatch):
                         lambda *_a, **_kw: {"rules": [], "findings": []})
 
     audit_id = audit_mod.create_audit_run(
-        db=db, account_id="371126261144", role_arn=None,
+        db=db, account_id="123456789012", role_arn=None,
         region="us-east-1", log_window_days=30, external_id=None,
     )
     audit_mod.run_audit_pipeline(audit_id, db)
@@ -266,7 +266,7 @@ def test_pdf_renders_remediation_from_flat_keys_not_nested():
     import datetime as _dt
 
     run = {
-        "_id": "x", "account_id": "371126261144", "data_source": "aws",
+        "_id": "x", "account_id": "123456789012", "data_source": "aws",
         "rule_count": 0, "web_acl_count": 0,
         "estimated_waste_usd": 0.0, "estimated_waste_breakdown": [],
         "created_at": _dt.datetime.now(_dt.timezone.utc),
@@ -303,7 +303,7 @@ def test_pdf_renderer_falls_back_when_no_remediation_present(caplog):
     import datetime as _dt
 
     run = {
-        "_id": "x", "account_id": "371126261144", "data_source": "aws",
+        "_id": "x", "account_id": "123456789012", "data_source": "aws",
         "rule_count": 0, "web_acl_count": 0,
         "estimated_waste_usd": 0.0, "estimated_waste_breakdown": [],
         "created_at": _dt.datetime.now(_dt.timezone.utc),
