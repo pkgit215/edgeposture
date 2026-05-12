@@ -170,3 +170,72 @@ def test_readme_references_exactly_three_screenshots():
         f"README must contain exactly 3 docs/screenshots/*.png image "
         f"references (Dashboard, PDF, Connect). Found {len(refs)}: {refs}"
     )
+
+
+# --- Chore: IAM ops extracted + v1.0 ROADMAP definition -------------------
+
+IAM_SETUP_MD = ROOT / "docs" / "iam-setup.md"
+
+
+def test_iam_ops_extracted():
+    """IAM operator commands (`aws iam put-role-policy`,
+    `aws iam update-assume-role-policy`) must live in
+    docs/iam-setup.md, NOT in the customer-facing README."""
+    readme_txt = README.read_text(encoding="utf-8")
+    assert "aws iam put-role-policy" not in readme_txt, (
+        "IAM operator commands found in README — these belong in "
+        "docs/iam-setup.md per the IAM extraction chore."
+    )
+    assert IAM_SETUP_MD.is_file(), (
+        f"missing {IAM_SETUP_MD} — IAM ops extraction did not land."
+    )
+    iam_txt = IAM_SETUP_MD.read_text(encoding="utf-8")
+    assert "aws iam put-role-policy" in iam_txt, (
+        "docs/iam-setup.md must contain the moved IAM operator "
+        "commands — that's the whole point of the extraction."
+    )
+    # The README must still link to iam-setup.md so readers can find it.
+    assert "docs/iam-setup.md" in readme_txt, (
+        "README must link docs/iam-setup.md so the moved content is "
+        "discoverable from the landing page."
+    )
+
+
+def test_readme_no_account_id_placeholder():
+    """Customer-facing README must never carry `<ACCOUNT_ID>` /
+    `<YOUR_AWS_ACCOUNT_ID>` placeholders — they read as bug reports.
+    Use a concrete dummy (123456789012, the AWS-reserved test ID) or
+    leave the value out entirely."""
+    readme_txt = README.read_text(encoding="utf-8")
+    for ph in ("<ACCOUNT_ID>", "<YOUR_AWS_ACCOUNT_ID>"):
+        assert ph not in readme_txt, (
+            f"README still contains placeholder {ph} — replace with the "
+            f"reserved dummy 123456789012 or drop the line."
+        )
+    # Same guardrail on the new iam-setup.md — the file we just split out
+    # of README; we don't want to leak placeholders into it either.
+    iam_txt = IAM_SETUP_MD.read_text(encoding="utf-8")
+    for ph in ("<ACCOUNT_ID>", "<YOUR_AWS_ACCOUNT_ID>"):
+        assert ph not in iam_txt, (
+            f"docs/iam-setup.md still contains placeholder {ph} — same "
+            f"rule as README."
+        )
+
+
+_V1_NUMBERED_RE = re.compile(r"^\s*[1-5]\.\s+\*\*[A-Z]", re.MULTILINE)
+
+
+def test_roadmap_has_v1_definition():
+    """ROADMAP must carry the `v1.0 definition` section with all five
+    numbered criteria. Catches a future drift where someone deletes a
+    bullet or strips the heading."""
+    txt = ROADMAP.read_text(encoding="utf-8")
+    assert "v1.0 definition" in txt, (
+        "ROADMAP missing `v1.0 definition` section — readers can't tell "
+        "when RuleIQ stops being v0.x without it."
+    )
+    matches = _V1_NUMBERED_RE.findall(txt)
+    assert len(matches) >= 5, (
+        f"v1.0 definition must enumerate 5 numbered criteria. Found "
+        f"{len(matches)} markdown lines matching `N. **Capitalized…`."
+    )
