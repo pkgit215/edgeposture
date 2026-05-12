@@ -28,7 +28,7 @@ const FINDINGS = [
       "Attack-shaped traffic is reaching your origin uninspected. Direct relevance to SOC 2 CC6.6.",
     suggested_actions: ["Enable KnownBadInputs."],
     verify_by: "Replay request.",
-    disclaimer: "RuleIQ does not generate WAF rules.",
+    disclaimer: "EdgePosture does not generate WAF rules.",
   },
 ];
 

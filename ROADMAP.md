@@ -1,26 +1,26 @@
-# RuleIQ — Roadmap
+# EdgePosture — Roadmap
 
 One-line-per-phase status board. Open backlog lives in GitHub Issues.
 
 ## v1.0 definition
 
-RuleIQ stops being v0.x and becomes v1.0 when all five are true:
+EdgePosture stops being v0.x and becomes v1.0 when all five are true:
 
 1. **One distribution path is decided and shipped** — self-host, hosted SaaS, AWS Marketplace, or hybrid. Customers can audit their own AWS account end-to-end without involving the maintainer.
 2. **Bypass detection coverage is broad** — at minimum: shellshock, log4shell, SQLi, XSS, unix CVEs, generic command injection. Each with deterministic signature classification, not AI-only.
 3. **Multi-region scan** — single audit run covers all AWS regions a customer uses, not just us-east-1.
 4. **Scheduled audits** — at least weekly cron with Slack / Teams / email notification on new HIGH findings.
-5. **Authentication on RuleIQ itself** — the hosted instance is no longer open. SSO via Google / Microsoft at minimum.
+5. **Authentication on EdgePosture itself** — the hosted instance is no longer open. SSO via Google / Microsoft at minimum.
 
 Cost optimization, IaC export, multi-cloud, and authenticated scans are post-v1.0.
 
 ## Distribution model (undecided)
 
-RuleIQ v0.1 runs only as a maintainer-hosted demo against the maintainer's own AWS account. Making it available to audit OTHER accounts is the highest-impact roadmap question. Possible paths under consideration:
+EdgePosture v0.1 runs only as a maintainer-hosted demo against the maintainer's own AWS account. Making it available to audit OTHER accounts is the highest-impact roadmap question. Possible paths under consideration:
 
-- **Self-hosted** — customers run their own RuleIQ instance via container deploy (App Runner / ECS / Fargate). Customer's IAM trust stays in customer's account.
-- **Hosted SaaS** — RuleIQ operates a multi-tenant control plane. Customer creates a cross-account IAM role trusting the RuleIQ SaaS account. Atlas becomes multi-tenant.
-- **AWS Marketplace SaaS / Container** — list RuleIQ as a Marketplace product so AWS handles billing + customer trust establishment.
+- **Self-hosted** — customers run their own EdgePosture instance via container deploy (App Runner / ECS / Fargate). Customer's IAM trust stays in customer's account.
+- **Hosted SaaS** — EdgePosture operates a multi-tenant control plane. Customer creates a cross-account IAM role trusting the EdgePosture SaaS account. Atlas becomes multi-tenant.
+- **AWS Marketplace SaaS / Container** — list EdgePosture as a Marketplace product so AWS handles billing + customer trust establishment.
 - **Hybrid** — open source the engine for self-host, run a managed SaaS for convenience.
 
 No decision yet. The choice affects IAM trust model, data residency, billing surface, multi-tenancy in Atlas, and onboarding UX.
@@ -52,14 +52,14 @@ No decision yet. The choice affects IAM trust model, data residency, billing sur
 - CSV export of Web ACL attachment inventory (`area:frontend`, `area:backend`).
 - UI provenance badge for log-sample evidence (`area:frontend`, `area:methodology`).
 - Slack / Teams webhook on HIGH findings (`area:integrations`).
-- Domain acquisition — `ruleiq.com` is squatter-parked on GoDaddy (broker fee ~£78 + likely $400–2,000 sale price); `.io` and `.ai` also taken. Decision before any public sharing (`area:deployment`, priority p2).
+- Domain acquisition — `edgeposture.io` is squatter-parked on GoDaddy (broker fee ~£78 + likely $400–2,000 sale price); `.io` and `.ai` also taken. Decision before any public sharing (`area:deployment`, priority p2).
 
 ## Backlog
 
 - Authenticated scans + ZAP integration helpers (`area:integrations`).
 - Scheduled audits — weekly cron (`area:integrations`).
 - Multi-region audit scan (`area:backend`).
-- App authentication — login on RuleIQ itself (`area:backend`, `area:frontend`).
+- App authentication — login on EdgePosture itself (`area:backend`, `area:frontend`).
 - Audit history diff — compare two runs (`area:frontend`, `area:backend`).
 - Migration plan — App Runner → ECS Express Mode (`area:deployment`).
 - Multi-cloud — Cloudflare, Akamai, Fastly WAF audits (`area:multicloud`).

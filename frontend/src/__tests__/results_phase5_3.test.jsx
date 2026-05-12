@@ -48,7 +48,7 @@ const FINDINGS = [
     ],
     verify_by: "Replay the captured request and confirm 403.",
     disclaimer:
-      "RuleIQ does not generate WAF rules. Recommendations point to AWS-maintained managed groups.",
+      "EdgePosture does not generate WAF rules. Recommendations point to AWS-maintained managed groups.",
   },
   {
     id: "f-count",
@@ -62,7 +62,7 @@ const FINDINGS = [
     severity_score: 50,
     suggested_actions: ["Promote to BLOCK after sampling."],
     verify_by: "Monitor for 7 days post-promotion.",
-    disclaimer: "RuleIQ does not generate WAF rules.",
+    disclaimer: "EdgePosture does not generate WAF rules.",
   },
 ];
 
@@ -110,7 +110,7 @@ describe("Phase 5.3 — Results UI", () => {
     const blocks = await screen.findAllByTestId("remediation-block");
     expect(blocks.length).toBe(FINDINGS.length);
     const disclaimer = await screen.findAllByTestId("remediation-disclaimer");
-    expect(disclaimer[0].textContent).toMatch(/RuleIQ does not generate WAF rules/);
+    expect(disclaimer[0].textContent).toMatch(/EdgePosture does not generate WAF rules/);
   });
 
   it("Remediation toggle hides/shows the block", async () => {

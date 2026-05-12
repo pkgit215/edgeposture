@@ -1,4 +1,4 @@
-# Contributing to RuleIQ
+# Contributing to EdgePosture
 
 Thanks for digging in. This page covers the workflow conventions; the
 hands-on setup (local dev commands, env vars, release / deploy notes)

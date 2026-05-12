@@ -33,7 +33,7 @@ function _payload(extraFindingFields) {
       impact: "Attack-shaped traffic reached origin.",
       suggested_actions: ["Add AWSManagedRulesSQLiRuleSet at priority 30."],
       verify_by: "Re-run after 24h.",
-      disclaimer: "RuleIQ does not generate WAF rules.",
+      disclaimer: "EdgePosture does not generate WAF rules.",
       ...extraFindingFields,
     }],
   };

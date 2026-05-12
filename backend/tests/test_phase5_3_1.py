@@ -283,7 +283,7 @@ def test_pdf_renders_remediation_from_flat_keys_not_nested():
             "Action two — deploy in COUNT first.",
         ],
         "verify_by": "Replay the captured request and confirm 403.",
-        "disclaimer": "RuleIQ does not generate WAF rules.",
+        "disclaimer": "EdgePosture does not generate WAF rules.",
     }]
     pdf_bytes = render_audit_pdf(run, [], findings)
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf_bytes)).pages)
@@ -291,7 +291,7 @@ def test_pdf_renders_remediation_from_flat_keys_not_nested():
     assert "AWSManagedRulesKnownBadInputsRuleSet" in text
     assert "Verify by" in text
     assert "Replay the captured request" in text
-    assert "RuleIQ does not generate WAF rules" in text
+    assert "EdgePosture does not generate WAF rules" in text
 
 
 def test_pdf_renderer_falls_back_when_no_remediation_present(caplog):

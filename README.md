@@ -1,18 +1,18 @@
-# RuleIQ — AI-powered AWS WAF audit
+# EdgePosture — AI-powered WAF audit
 
 > **🔗 Live demo:** https://d96qfmakzi.us-east-1.awsapprunner.com/demo — see a sample audit with no AWS setup.
 
-> **⚠️ Status: v0.1 beta — public demo only.** RuleIQ is not yet deployable into your own AWS account. The hosted instance at the demo URL is the only running deployment; it audits the maintainer's test account. Bringing RuleIQ to other accounts (self-host, hosted SaaS, AWS Marketplace, or another model) is on the [roadmap](ROADMAP.md) — the distribution path is not yet decided.
+> **⚠️ Status: v0.1 beta — public demo only.** EdgePosture is not yet deployable into your own AWS account. The hosted instance at the demo URL is the only running deployment; it audits the maintainer's test account. Bringing EdgePosture to other accounts (self-host, hosted SaaS, AWS Marketplace, or another model) is on the [roadmap](ROADMAP.md) — the distribution path is not yet decided.
 
-Most AWS WAF deployments have rules that haven't fired in months, rules that should be blocking attacks but aren't, and rules nobody remembers writing. RuleIQ tells you which ones — in 2 minutes, not after a week of CloudWatch spelunking.
+Most AWS WAF deployments have rules that haven't fired in months, rules that should be blocking attacks but aren't, and rules nobody remembers writing. EdgePosture tells you which ones — in 2 minutes, not after a week of CloudWatch spelunking.
 
-The headline finding: **attack-shaped traffic that reached your origin uninspected**. Shellshock, log4shell, SQL injection patterns that your WAF should have blocked but didn't. RuleIQ ships you a plain-English PDF showing exactly which signatures got through, on which Web ACL, with citations to the actual log entries — and a specific next action to close the gap.
+The headline finding: **attack-shaped traffic that reached your origin uninspected**. Shellshock, log4shell, SQL injection patterns that your WAF should have blocked but didn't. EdgePosture ships you a plain-English PDF showing exactly which signatures got through, on which Web ACL, with citations to the actual log entries — and a specific next action to close the gap.
 
 Cleaning up dead rules and recovering the few dollars they cost is a bonus, not the point.
 
 ## What it looks like
 
-![RuleIQ findings dashboard — severity badges, account-specific remediation, FMS pill](docs/screenshots/dashboard.png)
+![EdgePosture findings dashboard — severity badges, account-specific remediation, FMS pill](docs/screenshots/dashboard.png)
 *Findings dashboard — severity badges, account-specific remediation, FMS Firewall Manager indicator.*
 
 ![PDF executive summary — high/medium/low counts and estimated monthly waste](docs/screenshots/pdf-exec-summary.png)
@@ -46,7 +46,7 @@ Current: **v0.1 beta — public hosted demo only.** Self-host + customer-account
 
 What works today: the hosted demo at the URL above, exercising every finding type (bypass / dead-rule / count-mode / conflict / orphan / FMS), the PDF export, and account-aware "smart" remediation — all against a committed test fixture, not a live customer account.
 
-What's next: bringing RuleIQ to other accounts (self-host, hosted SaaS, AWS Marketplace, or another model — undecided), multi-region inspection, multi-cloud (Cloudflare / Fastly / Akamai), drift-to-IaC export, scheduled audits, app-level auth.
+What's next: bringing EdgePosture to other accounts (self-host, hosted SaaS, AWS Marketplace, or another model — undecided), multi-region inspection, multi-cloud (Cloudflare / Fastly / Akamai), drift-to-IaC export, scheduled audits, app-level auth.
 
 ## Contributing
 

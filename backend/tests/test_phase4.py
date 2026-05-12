@@ -274,7 +274,7 @@ def test_pdf_endpoint_returns_200_for_complete_audit(client, db):
     assert resp.headers["content-type"] == "application/pdf"
     cd = resp.headers["content-disposition"]
     assert "attachment" in cd
-    assert "ruleiq-audit-111122223333-" in cd
+    assert "edgeposture-audit-111122223333-" in cd
     assert cd.endswith('.pdf"')
     body = resp.content
     assert body[:5] == b"%PDF-"

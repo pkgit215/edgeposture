@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 UNIVERSAL_DISCLAIMER = (
-    "RuleIQ does not generate WAF rules. Recommendations point to "
+    "EdgePosture does not generate WAF rules. Recommendations point to "
     "AWS-maintained managed groups and high-level configuration changes. "
     "Deploy new rules in COUNT mode for 7+ days before promoting to BLOCK "
     "to assess false-positive risk. Test in non-production WAFs when "
@@ -110,7 +110,7 @@ _TABLE: Dict[str, Dict[str, Any]] = {
             ),
         ],
         "verify_by": (
-            "After cleanup: re-run a RuleIQ audit and confirm the "
+            "After cleanup: re-run an EdgePosture audit and confirm the "
             "stranded finding is gone."
         ),
     },
@@ -127,7 +127,7 @@ _TABLE: Dict[str, Dict[str, Any]] = {
             ),
         ],
         "verify_by": (
-            "After consolidation: re-run a RuleIQ audit and confirm no "
+            "After consolidation: re-run an EdgePosture audit and confirm no "
             "duplicate finding is produced for this rule pair."
         ),
     },
@@ -139,7 +139,7 @@ _TABLE: Dict[str, Dict[str, Any]] = {
             ),
         ],
         "verify_by": (
-            "After cleanup: re-run a RuleIQ audit and confirm the "
+            "After cleanup: re-run an EdgePosture audit and confirm the "
             "duplicate finding is gone, and the remaining rule's hit "
             "count includes the merged traffic."
         ),
@@ -311,7 +311,7 @@ def remediation_for(
                 "Review the finding with the team that owns the affected rules."
             ],
             "verify_by": (
-                "Re-run a RuleIQ audit after taking action; the finding "
+                "Re-run an EdgePosture audit after taking action; the finding "
                 "should disappear or downgrade."
             ),
         }

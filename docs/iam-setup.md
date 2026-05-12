@@ -1,21 +1,21 @@
-# RuleIQ IAM setup (operational)
+# EdgePosture IAM setup (operational)
 
 Cross-link: [README](../README.md) · [DEVELOPMENT.md](DEVELOPMENT.md)
 
 ## Why this lives here
 
-This is operator-flavoured material for the future self-hosted distribution path — what a RuleIQ self-host operator (or the future hosted-SaaS control plane) will do to provision the read-only audit role inside a customer AWS account. It is **not** customer-facing onboarding copy and is **not** wired up in v0.1. The customer-facing README intentionally keeps to value-prop + screenshots + status; everything below moves here so the README stays a 100-line marketing page rather than an operator runbook.
+This is operator-flavoured material for the future self-hosted distribution path — what a EdgePosture self-host operator (or the future hosted-SaaS control plane) will do to provision the read-only audit role inside a customer AWS account. It is **not** customer-facing onboarding copy and is **not** wired up in v0.1. The customer-facing README intentionally keeps to value-prop + screenshots + status; everything below moves here so the README stays a 100-line marketing page rather than an operator runbook.
 
 ## What customers will be granting (read-only IAM policy)
 
-This is the policy a future self-hosted deploy will request from customer AWS accounts via a CloudFormation Quick-Create stack. Zero write permissions — RuleIQ will not modify, create, or delete anything in any customer account. Authoritative template lives at [`cloudformation/customer-role.yaml`](../cloudformation/customer-role.yaml).
+This is the policy a future self-hosted deploy will request from customer AWS accounts via a CloudFormation Quick-Create stack. Zero write permissions — EdgePosture will not modify, create, or delete anything in any customer account. Authoritative template lives at [`cloudformation/customer-role.yaml`](../cloudformation/customer-role.yaml).
 
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "RuleIQReadWAF",
+      "Sid": "EdgePostureReadWAF",
       "Effect": "Allow",
       "Action": [
         "wafv2:ListWebACLs",
@@ -30,7 +30,7 @@ This is the policy a future self-hosted deploy will request from customer AWS ac
       "Resource": "*"
     },
     {
-      "Sid": "RuleIQReadLogs",
+      "Sid": "EdgePostureReadLogs",
       "Effect": "Allow",
       "Action": [
         "logs:DescribeLogGroups",
@@ -41,7 +41,7 @@ This is the policy a future self-hosted deploy will request from customer AWS ac
       "Resource": "*"
     },
     {
-      "Sid": "RuleIQReadAttachments",
+      "Sid": "EdgePostureReadAttachments",
       "Effect": "Allow",
       "Action": [
         "cloudfront:ListDistributions",
@@ -60,7 +60,7 @@ This is the policy a future self-hosted deploy will request from customer AWS ac
 
 ## Trust policy (RuleIQAuditRole)
 
-The `RuleIQAuditRole` in the customer AWS account trusts the RuleIQ host AWS account (specifically: the App Runner instance role) via a per-tenant `ExternalId`. The ExternalId is HMAC-derived from `EXTERNAL_ID_SECRET` (kept in Secrets Manager on the RuleIQ host side) and the customer's AWS account number — stable across page reloads, unique per customer.
+The `RuleIQAuditRole` in the customer AWS account trusts the EdgePosture host AWS account (specifically: the App Runner instance role) via a per-tenant `ExternalId`. The ExternalId is HMAC-derived from `EXTERNAL_ID_SECRET` (kept in Secrets Manager on the EdgePosture host side) and the customer's AWS account number — stable across page reloads, unique per customer.
 
 ```json
 {
@@ -82,7 +82,7 @@ The `RuleIQAuditRole` in the customer AWS account trusts the RuleIQ host AWS acc
 }
 ```
 
-`123456789012` above is the AWS-reserved test account ID — replace with the actual RuleIQ host account when self-host ships. The customer-facing CloudFormation template substitutes this at apply-time via a Quick-Create parameter.
+`123456789012` above is the AWS-reserved test account ID — replace with the actual EdgePosture host account when self-host ships. The customer-facing CloudFormation template substitutes this at apply-time via a Quick-Create parameter.
 
 ## Operational commands (future self-host)
 
@@ -95,7 +95,7 @@ aws cloudformation create-stack \
   --template-url "https://ruleiq-public-templates-${RULEIQ_HOST_ACCOUNT_ID}.s3.${AWS_REGION}.amazonaws.com/customer-role.yaml" \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters \
-      ParameterKey=RuleIQHostAccountId,ParameterValue="${RULEIQ_HOST_ACCOUNT_ID}" \
+      ParameterKey=EdgePostureHostAccountId,ParameterValue="${RULEIQ_HOST_ACCOUNT_ID}" \
       ParameterKey=ExternalId,ParameterValue="${PER_TENANT_EXTERNAL_ID}"
 
 # 2. If you need to attach an additional inline policy (rare — the CFN
@@ -107,7 +107,7 @@ aws iam put-role-policy \
   --policy-document file://extra-permissions.json
 
 # 3. Force a refresh of the trust policy on the auditor role — e.g. when
-#    the RuleIQ host account ID rotates:
+#    the EdgePosture host account ID rotates:
 aws iam update-assume-role-policy \
   --role-name RuleIQAuditRole \
   --policy-document file://trust-policy.json
@@ -115,11 +115,11 @@ aws iam update-assume-role-policy \
 
 ### IAM propagation timing
 
-Newly-created IAM roles can take **30–60 seconds** to become assumable by `sts:AssumeRole` across regions. If a fresh stack creation is followed by an immediate audit kick-off, the first `AssumeRole` call may return `AccessDenied` even though the role is correctly defined. Re-try with exponential backoff (RuleIQ retries up to 6 times, capping at 30s).
+Newly-created IAM roles can take **30–60 seconds** to become assumable by `sts:AssumeRole` across regions. If a fresh stack creation is followed by an immediate audit kick-off, the first `AssumeRole` call may return `AccessDenied` even though the role is correctly defined. Re-try with exponential backoff (EdgePosture retries up to 6 times, capping at 30s).
 
 ## What this policy **cannot** do
 
-By construction, the policy above grants **zero write actions**. RuleIQ cannot:
+By construction, the policy above grants **zero write actions**. EdgePosture cannot:
 
 - Modify, create, delete, or override any WAF rule, ACL, or rule group
 - Touch CloudFront / ALB / API Gateway resources beyond reading their metadata

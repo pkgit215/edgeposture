@@ -170,7 +170,7 @@ def test_spa_mount_does_not_shadow_api_routes(tmp_path, monkeypatch):
 
         oa = client.get("/api/openapi.json")
         assert oa.status_code == 200
-        assert oa.json()["info"]["title"] == "RuleIQ"
+        assert oa.json()["info"]["title"] == "EdgePosture"
     finally:
         db_mod.clear_test_db()
 
