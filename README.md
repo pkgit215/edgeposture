@@ -1,6 +1,6 @@
 # EdgePosture — AI-powered WAF audit
 
-> **🔗 Live demo:** https://d96qfmakzi.us-east-1.awsapprunner.com/demo — see a sample audit with no AWS setup.
+> **🔗 Live demo:** https://edgeposture.io/demo — see a sample audit with no AWS setup.
 
 > **⚠️ Status: v0.1 beta — public demo only.** EdgePosture is not yet deployable into your own AWS account. The hosted instance at the demo URL is the only running deployment; it audits the maintainer's test account. Bringing EdgePosture to other accounts (self-host, hosted SaaS, AWS Marketplace, or another model) is on the [roadmap](ROADMAP.md) — the distribution path is not yet decided.
 
@@ -33,7 +33,7 @@ Cleaning up dead rules and recovering the few dollars they cost is a bonus, not 
 
 ## What you can do today
 
-- View the live demo at https://d96qfmakzi.us-east-1.awsapprunner.com/demo to see a sample audit — Findings, Rules, Methodology tabs, plus a downloadable sample PDF report. **No AWS setup required.**
+- View the live demo at https://edgeposture.io/demo to see a sample audit — Findings, Rules, Methodology tabs, plus a downloadable sample PDF report. **No AWS setup required.**
 - That is the only end-to-end flow available in v0.1. The self-serve "audit your own AWS account" flow is not yet wired in; the hosted demo only trusts the maintainer's test account.
 
 ## IAM policy (reference only)
@@ -47,6 +47,12 @@ Current: **v0.1 beta — public hosted demo only.** Self-host + customer-account
 What works today: the hosted demo at the URL above, exercising every finding type (bypass / dead-rule / count-mode / conflict / orphan / FMS), the PDF export, and account-aware "smart" remediation — all against a committed test fixture, not a live customer account.
 
 What's next: bringing EdgePosture to other accounts (self-host, hosted SaaS, AWS Marketplace, or another model — undecided), multi-region inspection, multi-cloud (Cloudflare / Fastly / Akamai), drift-to-IaC export, scheduled audits, app-level auth.
+
+## About
+
+EdgePosture — AI-powered WAF audit.
+
+Built by a former AWS edge infrastructure owner with 10+ years of WAF and CDN experience.
 
 ## Contributing
 

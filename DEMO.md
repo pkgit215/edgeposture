@@ -2,7 +2,7 @@
 
 > **⚠️ Status: v0.1 beta — public demo only.** The self-serve "audit your own AWS account" flow is **not functional** in v0.1. The hosted instance only trusts the maintainer's test account.
 
-**🔗 Live sample audit (no AWS setup):** https://d96qfmakzi.us-east-1.awsapprunner.com/demo
+**🔗 Live sample audit (no AWS setup):** https://edgeposture.io/demo
 
 ## What you can do in the demo
 
@@ -10,7 +10,7 @@ The `/demo` URL above is the only end-to-end flow available today. It renders a 
 
 ## Walkthrough
 
-1. **Open https://d96qfmakzi.us-east-1.awsapprunner.com/demo** — no IAM role, no Account ID, no AWS console needed.
+1. **Open https://edgeposture.io/demo** — no IAM role, no Account ID, no AWS console needed.
 2. **Explore the tabs** — Findings (severity-sorted with remediation expansions), Rules (all 52 rules across 4 Web ACLs with hit counts), and Methodology (severity / confidence / waste-cost methodology). Click **Download Report** for the sample PDF.
 3. **There is no step 3.** The "audit your own AWS account" flow is not available in v0.1 — see the status callout above. Future support for auditing your own AWS account is on the roadmap — exact distribution model (self-host, SaaS, Marketplace, or other) is undecided. See [ROADMAP.md](ROADMAP.md#distribution-model-undecided) for the options under consideration.
 
