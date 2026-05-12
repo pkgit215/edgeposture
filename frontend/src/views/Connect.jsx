@@ -121,10 +121,10 @@ export default function Connect({ onAuditStarted }) {
     <div className="space-y-10">
       <div data-testid="hero">
         <h1 className="text-4xl font-bold text-slate-900 tracking-tight">
-          RuleIQ
+          EdgePosture
         </h1>
         <p className="mt-2 text-lg text-slate-600">
-          AI-powered AWS WAF audits.
+          AI-powered WAF posture audits.
         </p>
       </div>
 
@@ -150,7 +150,7 @@ export default function Connect({ onAuditStarted }) {
           </div>
           <p className="mt-2 text-sm text-slate-600">
             Your 12-digit account ID is used to derive a stable, per-tenant
-            ExternalId so the IAM role you create stays linked to RuleIQ across
+            ExternalId so the IAM role you create stays linked to EdgePosture across
             page reloads.
           </p>
         </div>
@@ -321,7 +321,7 @@ export default function Connect({ onAuditStarted }) {
       {/* Demo shortcut when no account id has been entered yet */}
       {!accountIdValid && (
         <section className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
-          Just want to see what RuleIQ outputs?{" "}
+          Just want to see what EdgePosture outputs?{" "}
           <button
             type="button"
             onClick={runDemoAudit}

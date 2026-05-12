@@ -306,7 +306,7 @@ function MethodologyTab() {
       <div data-testid="methodology-confidence">
         <h3 className="text-base font-semibold text-slate-900">Confidence (0–100%)</h3>
         <p className="mt-2">
-          How sure RuleIQ is that this finding is real, not a false positive.
+          How sure EdgePosture is that this finding is real, not a false positive.
         </p>
         <ul className="mt-2 space-y-1.5">
           <li>
@@ -345,7 +345,7 @@ function MethodologyTab() {
       </div>
       <div data-testid="methodology-not">
         <h3 className="text-base font-semibold text-slate-900">
-          What RuleIQ does NOT do
+          What EdgePosture does NOT do
         </h3>
         <ul className="mt-2 space-y-1.5">
           <li>Does not write or modify any rule in your account.</li>

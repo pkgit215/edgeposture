@@ -1,4 +1,4 @@
-"""RuleIQ FastAPI application — Phase 2.
+"""EdgePosture FastAPI application — Phase 2.
 
 Phase 1 endpoints kept; new Phase 2 surface:
     GET  /api/setup-info       — Quick-Create CFN URL + ExternalId + IAM JSON
@@ -52,7 +52,7 @@ SPA_DIST_DIR = Path(
     os.environ.get("RULEIQ_SPA_DIST", "/app/static")
 )
 logger.info(
-    "RuleIQ Phase 3 starting | DEMO_MODE=%s TESTING=%s SPA_DIST=%s",
+    "EdgePosture Phase 3 starting | DEMO_MODE=%s TESTING=%s SPA_DIST=%s",
     DEMO_MODE, TESTING, SPA_DIST_DIR,
 )
 
@@ -68,7 +68,7 @@ def load_fixture_rules() -> List[Dict[str, Any]]:
 
 
 app = FastAPI(
-    title="RuleIQ",
+    title="EdgePosture",
     description="AI-powered AWS WAF audit tool — Phase 3",
     version="0.4.0",
     openapi_url="/api/openapi.json",
@@ -211,8 +211,8 @@ def _build_quick_create_url(template_url: str, external_id: str) -> str:
     )
     params = (
         f"templateURL={quote(template_url, safe='')}"
-        f"&stackName=RuleIQAuditRole"
-        f"&param_RuleIQTrustedAccount={APP_RUNNER_ACCOUNT_ID}"
+        f"&stackName=EdgePostureAuditRole"
+        f"&param_EdgePostureTrustedAccount={APP_RUNNER_ACCOUNT_ID}"
         f"&param_ExternalId={quote(external_id)}"
     )
     # The fragment after `quickcreate` is the SPA route's own query string —
@@ -468,7 +468,7 @@ def get_demo_report_pdf() -> Response:
         content=p.read_bytes(),
         media_type="application/pdf",
         headers={
-            "Content-Disposition": 'inline; filename="ruleiq-demo-audit.pdf"',
+            "Content-Disposition": 'inline; filename="edgeposture-demo-audit.pdf"',
         },
     )
 
@@ -566,7 +566,7 @@ def get_audit_report_pdf(audit_id: str) -> Response:
     else:
         ymd = datetime.now().strftime("%Y%m%d")
     account = run.get("account_id") or "unknown"
-    filename = f"ruleiq-audit-{account}-{ymd}.pdf"
+    filename = f"edgeposture-audit-{account}-{ymd}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

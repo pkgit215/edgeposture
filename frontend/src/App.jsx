@@ -48,7 +48,7 @@ export default function App() {
         {view === "history" && <History onOpenAudit={goResults} />}
       </main>
       <footer className="max-w-6xl mx-auto px-6 py-8 text-xs text-slate-500">
-        RuleIQ · AI-powered AWS WAF audits · Phase 3
+        EdgePosture · WAF posture audits
       </footer>
     </div>
   );
@@ -62,7 +62,7 @@ function DemoBanner({ onGoConnect }) {
     >
       <span>
         <span aria-hidden="true">📊</span> You're viewing a sample audit. To run
-        RuleIQ against your own AWS account,
+        EdgePosture against your own AWS account,
       </span>
       <a
         href="/"
@@ -101,9 +101,9 @@ function Nav({ view, setView }) {
           <div className="h-8 w-8 rounded bg-slate-900 text-white grid place-items-center text-sm font-bold">
             R
           </div>
-          <div className="font-semibold text-slate-900">RuleIQ</div>
+          <div className="font-semibold text-slate-900">EdgePosture</div>
           <div className="text-xs text-slate-500 ml-2 hidden sm:block">
-            AWS WAF audit
+            WAF posture audit
           </div>
         </div>
         <nav className="flex items-center gap-1">

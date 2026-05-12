@@ -152,7 +152,7 @@ def _make_footer(generated_at: str):
         canvas.drawString(
             doc.leftMargin,
             doc.bottomMargin - 24,
-            f"RuleIQ Audit Report  ·  {generated_at}",
+            f"EdgePosture Audit Report  ·  {generated_at}",
         )
         canvas.drawRightString(
             LETTER[0] - doc.rightMargin,
@@ -202,8 +202,8 @@ def _summary_stats(audit_run: Dict[str, Any], rules: Sequence[Dict[str, Any]],
 def _build_cover(audit_run: Dict[str, Any], stats: Dict[str, Any],
                  generated_at: str, S: Dict[str, ParagraphStyle]) -> List[Flowable]:
     out: List[Flowable] = []
-    out.append(Paragraph("RuleIQ", S["muted"]))
-    out.append(Paragraph("AWS WAF Audit Report", S["h1"]))
+    out.append(Paragraph("EdgePosture", S["muted"]))
+    out.append(Paragraph("WAF Posture Audit Report", S["h1"]))
     out.append(Spacer(1, 18))
 
     data_source = (audit_run.get("data_source") or "fixture").lower()
@@ -1065,8 +1065,8 @@ def render_audit_pdf(
         rightMargin=0.5 * inch,
         topMargin=0.5 * inch,
         bottomMargin=0.6 * inch,
-        title="RuleIQ Audit Report",
-        author="RuleIQ",
+        title="EdgePosture Audit Report",
+        author="EdgePosture",
     )
     frame = Frame(
         doc.leftMargin,
@@ -1136,7 +1136,7 @@ def _build_methodology_appendix(S: Dict[str, ParagraphStyle]) -> List[Flowable]:
         "descending in both UI and PDF.",
     ])
     _section("Confidence (0–100%)", [
-        "How sure RuleIQ is that this finding is real, not a false positive.",
+        "How sure EdgePosture is that this finding is real, not a false positive.",
         "<b>90–100%:</b> structural — derived directly from AWS "
         "configuration (e.g., a Web ACL with zero "
         "<i>ListResourcesForWebACL</i> results is unambiguously orphaned).",
@@ -1155,7 +1155,7 @@ def _build_methodology_appendix(S: Dict[str, ParagraphStyle]) -> List[Flowable]:
         "<b>ai-inference</b> — derived from GPT-4o reasoning over rule "
         "JSON + statistics. Lowest weight.",
     ])
-    _section("What RuleIQ does NOT do", [
+    _section("What EdgePosture does NOT do", [
         "Does not write or modify any rule in your account.",
         "Does not store AWS keys — uses STS AssumeRole each run, session "
         "tokens only.",

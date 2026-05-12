@@ -242,7 +242,7 @@ def test_pdf_renders_remediation_block_and_disclaimer():
     assert "Remediation" in text
     assert "Suggested actions" in text
     assert "Verify by" in text
-    assert "RuleIQ does not generate WAF rules" in text
+    assert "EdgePosture does not generate WAF rules" in text
 
 
 def test_pdf_cover_leads_with_security_posture_not_cost():

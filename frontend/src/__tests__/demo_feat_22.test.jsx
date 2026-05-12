@@ -67,7 +67,7 @@ const DEMO_PAYLOAD = {
       impact: "Attack-shaped traffic reached origin.",
       suggested_actions: ["Enable AWSManagedRulesSQLiRuleSet."],
       verify_by: "Re-run audit after 24h.",
-      disclaimer: "RuleIQ does not generate WAF rules.",
+      disclaimer: "EdgePosture does not generate WAF rules.",
     },
   ],
 };

@@ -1,4 +1,4 @@
-# RuleIQ — known issues
+# EdgePosture — known issues
 
 Live observations from earlier phase reviews. Each entry is intentionally
 verbatim from the phase brief that surfaced it; do not rewrite without
@@ -79,7 +79,7 @@ What is NOT masked (and why):
 - `.github/workflows/deploy.yml` — App Runner / ECR / IAM ARNs are required
   for the deploy itself.
 - `cloudformation/customer-role.yaml` — the trust policy needs the literal
-  RuleIQ account ID so customers' roles know whom to trust.
+  EdgePosture account ID so customers' roles know whom to trust.
 - Test fixtures (`backend/fixtures/waf_rules.json`) — fixture rule ARNs use
   a placeholder account so the tests don't depend on a real account.
 - Source code env-var defaults (e.g. `RULEIQ_APP_RUNNER_ACCOUNT_ID`

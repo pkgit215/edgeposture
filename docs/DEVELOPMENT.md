@@ -1,4 +1,4 @@
-# RuleIQ — developer notes
+# EdgePosture — developer notes
 
 Internal docs for contributors and maintainers. Customer-facing material
 lives in [`README.md`](../README.md). For the PR / branch / commit
@@ -35,7 +35,7 @@ and variables → Actions:
 
 | Kind     | Name                  | Purpose                                                                 |
 |----------|-----------------------|-------------------------------------------------------------------------|
-| Variable | `AWS_ACCOUNT_ID`      | RuleIQ host AWS account ID. All ARNs in the workflow resolve through it |
+| Variable | `AWS_ACCOUNT_ID`      | EdgePosture host AWS account ID. All ARNs in the workflow resolve through it |
 | Secret   | `OPENAI_API_KEY`      | Pulled from Secrets Manager at runtime; used by `services/ai_pipeline.py` |
 | Secret   | `MONGODB_URI`         | Pulled from Secrets Manager at runtime; used by `services/db.py`        |
 
@@ -50,7 +50,7 @@ deploy + S3 sync (for the public CloudFormation template bucket).
 | `OPENAI_API_KEY`                  | Overrides Secrets Manager fetch in local dev                       | unset                                  |
 | `MONGODB_URI`                     | Overrides Secrets Manager fetch in local dev                       | unset                                  |
 | `DEMO_MODE`                       | When `true`, audits use fixtures even with `role_arn`              | `true`                                 |
-| `RULEIQ_APP_RUNNER_ACCOUNT_ID`    | Account that hosts RuleIQ; baked into customer CFN trust policy    | `<YOUR_AWS_ACCOUNT_ID>` placeholder    |
+| `RULEIQ_APP_RUNNER_ACCOUNT_ID`    | Account that hosts EdgePosture; baked into customer CFN trust policy    | `<YOUR_AWS_ACCOUNT_ID>` placeholder    |
 | `RULEIQ_PUBLIC_TEMPLATES_BUCKET`  | Public S3 bucket holding `customer-role.yaml`                      | `ruleiq-public-templates-<account>`    |
 | `EXTERNAL_ID_SECRET`              | 64-char HMAC seed for deriving per-tenant ExternalId values        | required                               |
 | `PORT`                            | uvicorn port                                                       | `8080`                                 |
@@ -103,7 +103,7 @@ afterward 4×Xs with `OperationInProgressException`. The workflow reads
 | `OPERATION_IN_PROGRESS` | Skip — auto-deploy already handling it                  |
 | `CREATE_FAILED` / etc.  | Fail loudly                                             |
 
-### Customer onboarding artefacts (run once per RuleIQ host account)
+### Customer onboarding artefacts (run once per EdgePosture host account)
 
 ```bash
 # Create the public-read S3 bucket that hosts customer-role.yaml.

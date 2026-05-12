@@ -321,13 +321,13 @@ def test_pdf_contains_impact_per_finding_and_methodology_appendix():
          "affected_rules": ["acl-x"], "confidence": 0.95,
          "severity_score": 90, "impact": "ATTACK IMPACT TEXT.",
          "suggested_actions": ["A1."], "verify_by": "V1.",
-         "disclaimer": "RuleIQ does not generate WAF rules."},
+         "disclaimer": "EdgePosture does not generate WAF rules."},
         {"type": "dead_rule", "severity": "medium",
          "title": "Dead", "description": "y", "recommendation": "z",
          "affected_rules": ["R1"], "confidence": 0.7,
          "severity_score": 50, "impact": "DEAD IMPACT TEXT.",
          "suggested_actions": ["A1."], "verify_by": "V1.",
-         "disclaimer": "RuleIQ does not generate WAF rules."},
+         "disclaimer": "EdgePosture does not generate WAF rules."},
     ]
     pdf_bytes = render_audit_pdf(run, [], findings)
     text = "\n".join(p.extract_text() for p in PdfReader(io.BytesIO(pdf_bytes)).pages)

@@ -1,4 +1,4 @@
-# RuleIQ — Live Demo
+# EdgePosture — Live Demo
 
 > **⚠️ Status: v0.1 beta — public demo only.** The self-serve "audit your own AWS account" flow is **not functional** in v0.1. The hosted instance only trusts the maintainer's test account.
 
@@ -16,4 +16,4 @@ The `/demo` URL above is the only end-to-end flow available today. It renders a 
 
 ## Safety / read-only context
 
-RuleIQ is designed to be a **read-only auditor**. The IAM policy it will request from customer accounts (see [README.md](README.md#iam-policy-reference-only)) contains zero write permissions — RuleIQ cannot modify, create, or delete WAF rules, ACLs, or any other AWS resource. The live demo does not touch any customer account.
+EdgePosture is designed to be a **read-only auditor**. The IAM policy it will request from customer accounts (see [README.md](README.md#iam-policy-reference-only)) contains zero write permissions — EdgePosture cannot modify, create, or delete WAF rules, ACLs, or any other AWS resource. The live demo does not touch any customer account.

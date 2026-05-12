@@ -86,7 +86,7 @@ def test_demo_report_pdf_endpoint_returns_pdf_bytes():
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/pdf")
     # Inline disposition — open in-browser preview, not a forced download.
-    assert "ruleiq-demo-audit.pdf" in resp.headers.get(
+    assert "edgeposture-demo-audit.pdf" in resp.headers.get(
         "content-disposition", ""
     )
     # Minimum sanity: a real PDF starts with `%PDF-`.
