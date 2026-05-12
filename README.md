@@ -38,57 +38,7 @@ Cleaning up dead rules and recovering the few dollars they cost is a bonus, not 
 
 ## IAM policy (reference only)
 
-This is the policy a future self-hosted deploy will request from customer AWS accounts via a CloudFormation Quick-Create stack. **Not yet wired into the v0.1 hosted instance** — listed here so prospective users can pre-review what RuleIQ will (and explicitly will not) be able to do once self-host support ships.
-
-Zero write permissions — RuleIQ will not modify, create, or delete anything in your account. Full template (when ready): [`cloudformation/customer-role.yaml`](cloudformation/customer-role.yaml).
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "RuleIQReadWAF",
-      "Effect": "Allow",
-      "Action": [
-        "wafv2:ListWebACLs",
-        "wafv2:GetWebACL",
-        "wafv2:ListRuleGroups",
-        "wafv2:GetRuleGroup",
-        "wafv2:GetLoggingConfiguration",
-        "wafv2:ListResourcesForWebACL",
-        "wafv2:ListAvailableManagedRuleGroups",
-        "wafv2:DescribeManagedRuleGroup"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "RuleIQReadLogs",
-      "Effect": "Allow",
-      "Action": [
-        "logs:DescribeLogGroups",
-        "logs:DescribeLogStreams",
-        "logs:FilterLogEvents",
-        "logs:GetLogEvents"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "RuleIQReadAttachments",
-      "Effect": "Allow",
-      "Action": [
-        "cloudfront:ListDistributions",
-        "cloudfront:GetDistribution",
-        "elasticloadbalancing:DescribeLoadBalancers",
-        "apigateway:GET",
-        "cognito-idp:DescribeUserPool",
-        "fms:GetAdminAccount",
-        "fms:ListComplianceStatus"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
+For the IAM role policies and AWS setup commands a future self-hosted deploy will require, see [docs/iam-setup.md](docs/iam-setup.md).
 
 ## Status
 

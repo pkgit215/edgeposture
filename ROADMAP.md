@@ -2,6 +2,18 @@
 
 One-line-per-phase status board. Open backlog lives in GitHub Issues.
 
+## v1.0 definition
+
+RuleIQ stops being v0.x and becomes v1.0 when all five are true:
+
+1. **One distribution path is decided and shipped** — self-host, hosted SaaS, AWS Marketplace, or hybrid. Customers can audit their own AWS account end-to-end without involving the maintainer.
+2. **Bypass detection coverage is broad** — at minimum: shellshock, log4shell, SQLi, XSS, unix CVEs, generic command injection. Each with deterministic signature classification, not AI-only.
+3. **Multi-region scan** — single audit run covers all AWS regions a customer uses, not just us-east-1.
+4. **Scheduled audits** — at least weekly cron with Slack / Teams / email notification on new HIGH findings.
+5. **Authentication on RuleIQ itself** — the hosted instance is no longer open. SSO via Google / Microsoft at minimum.
+
+Cost optimization, IaC export, multi-cloud, and authenticated scans are post-v1.0.
+
 ## Distribution model (undecided)
 
 RuleIQ v0.1 runs only as a maintainer-hosted demo against the maintainer's own AWS account. Making it available to audit OTHER accounts is the highest-impact roadmap question. Possible paths under consideration:
@@ -40,6 +52,7 @@ No decision yet. The choice affects IAM trust model, data residency, billing sur
 - CSV export of Web ACL attachment inventory (`area:frontend`, `area:backend`).
 - UI provenance badge for log-sample evidence (`area:frontend`, `area:methodology`).
 - Slack / Teams webhook on HIGH findings (`area:integrations`).
+- Domain acquisition — `ruleiq.com` is squatter-parked on GoDaddy (broker fee ~£78 + likely $400–2,000 sale price); `.io` and `.ai` also taken. Decision before any public sharing (`area:deployment`, priority p2).
 
 ## Backlog
 
@@ -54,4 +67,3 @@ No decision yet. The choice affects IAM trust model, data residency, billing sur
 - "Email this PDF to my auditor" button — SES (`area:frontend`, `area:backend`).
 - `?print=true` query-string for browser-printable Results view (`area:frontend`).
 - `/api/version` endpoint with git SHA + build timestamp (`area:backend`).
-- Domain acquisition — `ruleiq.com` via GoDaddy or broker, ceiling $1.5k (`area:deployment`).
