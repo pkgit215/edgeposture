@@ -29,7 +29,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-os.environ["RULEIQ_TESTING"] = "1"
+os.environ["EDGEPOSTURE_TESTING"] = "1"
 os.environ.setdefault("EXTERNAL_ID_SECRET", "a" * 64)
 os.environ.setdefault("DEMO_MODE", "true")
 

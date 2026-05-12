@@ -54,6 +54,42 @@ EdgePosture — AI-powered WAF audit.
 
 Built by a former AWS edge infrastructure owner with 10+ years of WAF and CDN experience.
 
+## Operating EdgePosture as a SaaS
+
+EdgePosture is moving from a single-instance demo deployment toward a
+multi-tenant SaaS. The first piece of that work — Google OAuth +
+per-tenant rows — ships in [#45](https://github.com/pkgit215/edgeposture/issues/45).
+
+**Closed beta.** Sign-in is gated by an explicit invite allowlist. Set
+the App Runner env var `INVITE_ALLOWLIST` to a comma-separated list:
+
+```
+INVITE_ALLOWLIST=pkennedyvt@gmail.com,*@yourcompany.com
+```
+
+Exact emails and `*@domain.com` wildcards are both supported. Unset =
+closed. Non-allowlisted users who sign in via Google land on a friendly
+"Beta access required — email hello@edgeposture.io" page; no tenant row
+is created.
+
+**Secrets** (AWS Secrets Manager, region `us-east-1`):
+
+| Secret | Shape | Purpose |
+|---|---|---|
+| `edgeposture/google-oauth` | JSON `{"client_id":"...","client_secret":"..."}` | Google Cloud OAuth 2.0 client |
+| `edgeposture/session-secret` | plain text (32 bytes hex) | Signs the `edgeposture_session` cookie + OAuth `state` |
+
+The App Runner instance role needs `secretsmanager:GetSecretValue` on
+both ARNs in addition to the existing `ruleiq/openai` and
+`ruleiq/mongodb` permissions.
+
+**Public routes** (no session required):
+`GET /api/health`, `GET /api/demo/*` (top-of-funnel anonymous demo),
+`GET /api/openapi.json`, `GET /api/docs`, `GET /api/redoc`, and the
+`/auth/*` OAuth handlers themselves. Everything else under `/api/*`
+returns `401 {"error":"authentication_required"}` for anonymous
+clients.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Local development setup, test commands, and deploy / release notes live in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).

@@ -36,7 +36,7 @@ logging.basicConfig(
 logger = logging.getLogger("ruleiq")
 
 DEMO_MODE = os.environ.get("DEMO_MODE", "true").lower() in ("1", "true", "yes")
-TESTING = os.environ.get("RULEIQ_TESTING", "0") == "1"
+TESTING = os.environ.get("EDGEPOSTURE_TESTING", "0") == "1"
 APP_RUNNER_ACCOUNT_ID = os.environ.get(
     "RULEIQ_APP_RUNNER_ACCOUNT_ID", "123456789012"
 )
@@ -84,11 +84,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Phase 1 of #45 — auth wiring (Google OAuth + tenants) -------------------
+# Order matters: include the router BEFORE adding AuthMiddleware so the
+# `/auth/*` and `/api/me` routes are themselves declared. The middleware
+# exempts `/auth/*` and `/api/demo/*` and `/api/health` from the auth
+# check — see `auth.middleware._is_public`.
+from auth import google as _auth_google  # noqa: E402
+from auth.middleware import AuthMiddleware  # noqa: E402
+
+app.include_router(_auth_google.router)
+app.add_middleware(AuthMiddleware)
+
 
 @app.on_event("startup")
 def _startup() -> None:
     if TESTING:
-        logger.info("RULEIQ_TESTING=1 — skipping startup seed and Mongo connect")
+        logger.info("EDGEPOSTURE_TESTING=1 — skipping startup seed and Mongo connect")
         return
     try:
         seed_mod.ensure_demo_seed()

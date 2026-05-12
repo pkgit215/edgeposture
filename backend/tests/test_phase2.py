@@ -25,7 +25,7 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-os.environ["RULEIQ_TESTING"] = "1"
+os.environ["EDGEPOSTURE_TESTING"] = "1"
 os.environ["AWS_DEFAULT_REGION"] = "us-east-1"
 # moto requires non-empty creds in env or in the call.
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")

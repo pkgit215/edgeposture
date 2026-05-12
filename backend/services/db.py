@@ -111,6 +111,24 @@ def ensure_indexes(db: Database) -> None:
         db["findings"].create_index(
             [("audit_run_id", ASCENDING)], name="findings_audit_run_id"
         )
+        # Phase 1 of #45 — tenants + sessions.
+        db["tenants"].create_index(
+            [("tenant_id", ASCENDING)], unique=True, name="tenants_tenant_id_unique"
+        )
+        db["tenants"].create_index(
+            [("email", ASCENDING)], unique=True, name="tenants_email_unique"
+        )
+        db["tenants"].create_index(
+            [("google_sub", ASCENDING)], name="tenants_google_sub"
+        )
+        # TTL — Mongo evicts session rows once `expires_at` is in the
+        # past (expireAfterSeconds=0 means "immediately at the time
+        # stored in this field"). Cookie max-age and session row
+        # expiry are aligned at SESSION_TTL_DAYS.
+        db["sessions"].create_index(
+            [("expires_at", ASCENDING)], name="sessions_ttl",
+            expireAfterSeconds=0,
+        )
         _indexes_ensured = True
     except Exception as exc:  # noqa: BLE001
         # Don't crash startup over an index race.
