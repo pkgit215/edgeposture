@@ -42,7 +42,7 @@ For the IAM role policies and AWS setup commands a future self-hosted deploy wil
 
 ## Status
 
-Current: **v0.1 beta — public hosted demo only.** Self-host + customer-account audit support tracked in [ROADMAP.md](ROADMAP.md).
+Current: **v0.1 beta — public hosted demo only.** The v0.2 (SaaS MVP) milestone is in flight — Google OAuth + tenant scaffolding shipped May 12, 2026. Self-host + customer-account audit support tracked in [ROADMAP.md](ROADMAP.md).
 
 What works today: the hosted demo at the URL above, exercising every finding type (bypass / dead-rule / count-mode / conflict / orphan / FMS), the PDF export, and account-aware "smart" remediation — all against a committed test fixture, not a live customer account.
 
