@@ -2,6 +2,17 @@
 
 One-line-per-phase status board. Open backlog lives in GitHub Issues.
 
+## Distribution model (undecided)
+
+RuleIQ v0.1 runs only as a maintainer-hosted demo against the maintainer's own AWS account. Making it available to audit OTHER accounts is the highest-impact roadmap question. Possible paths under consideration:
+
+- **Self-hosted** — customers run their own RuleIQ instance via container deploy (App Runner / ECS / Fargate). Customer's IAM trust stays in customer's account.
+- **Hosted SaaS** — RuleIQ operates a multi-tenant control plane. Customer creates a cross-account IAM role trusting the RuleIQ SaaS account. Atlas becomes multi-tenant.
+- **AWS Marketplace SaaS / Container** — list RuleIQ as a Marketplace product so AWS handles billing + customer trust establishment.
+- **Hybrid** — open source the engine for self-host, run a managed SaaS for convenience.
+
+No decision yet. The choice affects IAM trust model, data residency, billing surface, multi-tenancy in Atlas, and onboarding UX.
+
 ## Shipped
 
 - **Phase 0** — POC: AI pipeline (Pass 1 explain + Pass 2 findings), FastAPI scaffold, ECR + App Runner deploy via GHA.

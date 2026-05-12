@@ -45,3 +45,58 @@ def test_readme_references_demo_url():
     assert "d96qfmakzi.us-east-1.awsapprunner.com" in text, (
         "README lost the live-demo callout — that's the entire above-the-fold hook."
     )
+
+
+# --- Chore: v0.1 beta clarification ---------------------------------------
+
+DEMO_MD = ROOT / "DEMO.md"
+
+_NON_FUNCTIONAL_INSTRUCTIONS = (
+    "paste your AWS Account ID",
+    "paste your Role ARN",
+)
+
+
+def test_readme_and_demo_md_advertise_beta_status():
+    """v0.1 is beta — both customer-facing docs must say so unambiguously.
+    Catches a future regression where the beta callout is silently dropped."""
+    for path in (README, DEMO_MD):
+        text = path.read_text(encoding="utf-8").lower()
+        assert "beta" in text, (
+            f"{path.name} no longer mentions beta status — keep the v0.1 "
+            f"callout unmissable per Chore: README beta clarification."
+        )
+
+
+def test_readme_and_demo_md_omit_nonfunctional_self_serve_instructions():
+    """v0.1 hosted instance only trusts the maintainer's AWS account.
+    Instructing customers to paste their Account ID / Role ARN dead-ends
+    them — those phrases must NOT appear in customer-facing docs until
+    the multi-tenant onboarding flow ships."""
+    for path in (README, DEMO_MD):
+        lower = path.read_text(encoding="utf-8").lower()
+        for phrase in _NON_FUNCTIONAL_INSTRUCTIONS:
+            assert phrase.lower() not in lower, (
+                f"{path.name} contains non-functional v0.1 instruction "
+                f"{phrase!r} — the self-serve audit flow against the "
+                f"customer's own AWS account is not wired in yet."
+            )
+
+
+# --- Distribution-model honesty ------------------------------------------
+
+ROADMAP = ROOT / "ROADMAP.md"
+
+
+def test_readme_and_roadmap_state_distribution_model_is_undecided():
+    """The distribution path (self-host / SaaS / Marketplace / hybrid)
+    is explicitly undecided. README and ROADMAP must both say so —
+    no assuming `self-host` as the locked-in answer."""
+    for path in (README, ROADMAP):
+        text = path.read_text(encoding="utf-8").lower()
+        assert "undecided" in text, (
+            f"{path.name} must state distribution model is undecided. "
+            f"Per the chore-readme-beta PR, both README + ROADMAP cite "
+            f"the open question explicitly so readers don't infer "
+            f"self-host is locked in."
+        )
