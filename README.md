@@ -4,16 +4,32 @@
 
 > **⚠️ Status: v0.1 beta — public demo only.** RuleIQ is not yet deployable into your own AWS account. The hosted instance at the demo URL is the only running deployment; it audits the maintainer's test account. Bringing RuleIQ to other accounts (self-host, hosted SaaS, AWS Marketplace, or another model) is on the [roadmap](ROADMAP.md) — the distribution path is not yet decided.
 
-RuleIQ is a read-only auditor for AWS WAFv2. Once self-host support lands, you'll point it at an AWS account and get a plain-English report — which rules never fire, which attack-shaped requests are reaching origin despite the WAF, which rules are silently in COUNT mode, which Web ACLs are orphaned — plus a downloadable PDF you can hand to a SOC 2 / ISO 27001 / PCI auditor or fold into M&A due diligence.
+Most AWS WAF deployments have rules that haven't fired in months, rules that should be blocking attacks but aren't, and rules nobody remembers writing. RuleIQ tells you which ones — in 2 minutes, not after a week of CloudWatch spelunking.
+
+The headline finding: **attack-shaped traffic that reached your origin uninspected**. Shellshock, log4shell, SQL injection patterns that your WAF should have blocked but didn't. RuleIQ ships you a plain-English PDF showing exactly which signatures got through, on which Web ACL, with citations to the actual log entries — and a specific next action to close the gap.
+
+Cleaning up dead rules and recovering the few dollars they cost is a bonus, not the point.
+
+## What it looks like
+
+![RuleIQ findings dashboard — severity badges, account-specific remediation, FMS pill](docs/screenshots/dashboard.png)
+*Findings dashboard — severity badges, account-specific remediation, FMS Firewall Manager indicator.*
+
+![PDF executive summary — high/medium/low counts and estimated monthly waste](docs/screenshots/pdf-exec-summary.png)
+*PDF executive summary — handed to auditors, board, customers.*
+
+![Connect screen — Quick-Create CloudFormation flow for the read-only IAM role](docs/screenshots/connect.png)
+*Connect screen (future self-host) — Quick-Create CloudFormation generates the read-only IAM role in one click.*
 
 ## What it does
 
-- Lists which WAF rules **never fired** in the last 30 days
-- Detects **attack-shaped traffic reaching origin** despite the WAF (shellshock, log4shell, SQLi, XSS)
-- Identifies rules silently in **COUNT mode** (logging, not blocking)
-- Flags **orphaned Web ACLs** still incurring monthly fees
-- Generates a **PDF report** you can hand to auditors
-- Plain-English **remediation** per finding, with the exact AWS console nav path
+- Detects **attack-shaped traffic reaching your origin** despite the WAF (shellshock, log4shell, SQLi, XSS, unix CVEs) — the headline finding
+- Flags rules silently sitting in **COUNT mode** when you probably think they're blocking
+- Identifies which managed rule groups your Web ACL is **missing** for the attacks it's seeing
+- Lists rules that **haven't fired in 30 days** — and whether they should have
+- Flags **orphaned Web ACLs** (attached to nothing, still billed)
+- Generates a **PDF you can hand** to auditors, board, or a customer security review
+- Plain-English **remediation** per finding with the exact AWS console nav path
 
 ## What you can do today
 
