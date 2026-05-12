@@ -879,6 +879,48 @@ def run_audit_pipeline(audit_run_id: str, db: Database) -> None:
                 continue
             f["affected_rules"] = list(attached_acl_names)
 
+        # Issue #34 — populate `signature_class` on `bypass_candidate`
+        # findings. Pass 3 emits bypass findings from the suspicious-
+        # request sample but does NOT propagate which attack class
+        # triggered them. Without `signature_class`, smart_remediation_for
+        # cannot pick a target AWS managed rule group and falls back to
+        # generic canned copy — exactly the production regression that
+        # GH issue #34 describes.
+        #
+        # Pick the highest-frequency `_signature_classes` value across
+        # suspicious requests whose `_web_acl_name` matches one of the
+        # ACLs in the finding's `affected_rules`. Stable tiebreak by
+        # class name so the same fixture produces the same result run
+        # over run.
+        suspicious_for_bypass = meta.get("suspicious_requests") or []
+        for f in final_findings:
+            if f.get("type") != "bypass_candidate":
+                continue
+            if f.get("signature_class"):
+                continue
+            acl_scope = set(f.get("affected_rules") or [])
+            class_counts: Dict[str, int] = {}
+            for req in suspicious_for_bypass:
+                wacl = req.get("_web_acl_name")
+                # If the finding is scoped to specific ACLs and the
+                # request has a known ACL tag, only count requests on
+                # those ACLs. Legacy untagged requests (no _web_acl_name)
+                # still contribute — that's the only signal available
+                # in older audit runs.
+                if wacl and acl_scope and wacl not in acl_scope:
+                    continue
+                for c in (req.get("_signature_classes") or []):
+                    if isinstance(c, str) and c:
+                        class_counts[c] = class_counts.get(c, 0) + 1
+            if not class_counts:
+                # No signal — leave signature_class None. Smart layer
+                # will fall back to canned remediation gracefully.
+                continue
+            top_class = sorted(
+                class_counts.items(), key=lambda x: (-x[1], x[0]),
+            )[0][0]
+            f["signature_class"] = top_class
+
         # Issue #4 — signature-class correlation for `dead_rule` severity.
         # Build the set of attack classes observed in this audit's
         # suspicious-request sample, then for each `dead_rule` HIGH from
