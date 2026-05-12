@@ -17,7 +17,7 @@ TESTS_DIR = BACKEND_DIR / "tests"
 sys.path.insert(0, str(BACKEND_DIR))
 sys.path.insert(0, str(TESTS_DIR))
 
-os.environ["RULEIQ_TESTING"] = "1"
+os.environ["EDGEPOSTURE_TESTING"] = "1"
 os.environ.setdefault("EXTERNAL_ID_SECRET", "a" * 64)
 os.environ["DEMO_MODE"] = "false"
 

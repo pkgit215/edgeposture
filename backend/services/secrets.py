@@ -23,10 +23,14 @@ logger = logging.getLogger(__name__)
 _OPENAI_KEY_CACHE: Optional[str] = None
 _MONGO_URI_CACHE: Optional[str] = None
 _EXTERNAL_ID_SECRET_CACHE: Optional[str] = None
+_GOOGLE_OAUTH_CACHE: Optional[dict] = None
+_SESSION_SECRET_CACHE: Optional[str] = None
 
 OPENAI_SECRET_ID = "ruleiq/openai"
 MONGO_SECRET_ID = "ruleiq/mongodb"
 EXTERNAL_ID_SECRET_ID = "ruleiq/external-id-secret"
+GOOGLE_OAUTH_SECRET_ID = "edgeposture/google-oauth"
+SESSION_SECRET_ID = "edgeposture/session-secret"
 AWS_REGION = "us-east-1"
 
 
@@ -125,9 +129,50 @@ def get_external_id_secret() -> str:
     return _EXTERNAL_ID_SECRET_CACHE
 
 
+def get_google_oauth_credentials() -> dict:
+    """Return Google OAuth client_id/client_secret as a dict.
+
+    Order:
+      1. EDGEPOSTURE_GOOGLE_OAUTH env var (JSON-encoded)
+      2. AWS Secrets Manager: edgeposture/google-oauth (JSON-shaped)
+    """
+    global _GOOGLE_OAUTH_CACHE
+    if _GOOGLE_OAUTH_CACHE:
+        return _GOOGLE_OAUTH_CACHE
+    env_val = os.environ.get("EDGEPOSTURE_GOOGLE_OAUTH")
+    if env_val:
+        _GOOGLE_OAUTH_CACHE = json.loads(env_val)
+        return _GOOGLE_OAUTH_CACHE
+    raw = _fetch_secret_string(GOOGLE_OAUTH_SECRET_ID)
+    _GOOGLE_OAUTH_CACHE = json.loads(raw)
+    return _GOOGLE_OAUTH_CACHE
+
+
+def get_session_secret() -> str:
+    """Return the secret used to sign session cookies + OAuth state.
+
+    Order:
+      1. EDGEPOSTURE_SESSION_SECRET env var (plain text)
+      2. AWS Secrets Manager: edgeposture/session-secret (plain text)
+    """
+    global _SESSION_SECRET_CACHE
+    if _SESSION_SECRET_CACHE:
+        return _SESSION_SECRET_CACHE
+    env_val = os.environ.get("EDGEPOSTURE_SESSION_SECRET")
+    if env_val:
+        _SESSION_SECRET_CACHE = env_val
+        return _SESSION_SECRET_CACHE
+    raw = _fetch_secret_string(SESSION_SECRET_ID).strip()
+    _SESSION_SECRET_CACHE = raw
+    return _SESSION_SECRET_CACHE
+
+
 def _reset_cache_for_tests() -> None:
     """Test-only helper to clear cached singletons."""
     global _OPENAI_KEY_CACHE, _MONGO_URI_CACHE, _EXTERNAL_ID_SECRET_CACHE
+    global _GOOGLE_OAUTH_CACHE, _SESSION_SECRET_CACHE
     _OPENAI_KEY_CACHE = None
     _MONGO_URI_CACHE = None
     _EXTERNAL_ID_SECRET_CACHE = None
+    _GOOGLE_OAUTH_CACHE = None
+    _SESSION_SECRET_CACHE = None

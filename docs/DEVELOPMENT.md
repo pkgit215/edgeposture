@@ -11,7 +11,7 @@ conventions, see [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-RULEIQ_TESTING=1 pytest tests/         # all backend tests; mocks OpenAI + Mongo + AWS
+EDGEPOSTURE_TESTING=1 pytest tests/         # all backend tests; mocks OpenAI + Mongo + AWS
 DEMO_MODE=true uvicorn main:app --reload --port 8001
 
 # Frontend

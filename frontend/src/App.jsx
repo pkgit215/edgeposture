@@ -2,11 +2,21 @@ import { useEffect, useState } from "react";
 import Connect from "./views/Connect.jsx";
 import Results from "./views/Results.jsx";
 import History from "./views/History.jsx";
+import Login from "./views/Login.jsx";
+import AppPlaceholder from "./views/AppPlaceholder.jsx";
 
 export default function App() {
+  // Phase 1 of #45 — Google OAuth landing pages. `/login` and `/app`
+  // bypass the normal Connect/Results/History tab navigation and
+  // render dedicated views.
+  const pathname =
+    typeof window !== "undefined" ? window.location.pathname : "/";
+  if (pathname === "/login") return <Login />;
+  if (pathname === "/app") return <AppPlaceholder />;
+
   // Issue #22 — `/demo` route renders the Results view against the
   // pre-canned `/api/demo/audit` fixture. No AWS setup required.
-  const isDemo = typeof window !== "undefined" && window.location.pathname === "/demo";
+  const isDemo = pathname === "/demo";
   const [view, setView] = useState(isDemo ? "demo" : "connect");
   const [auditId, setAuditId] = useState(null);
 
