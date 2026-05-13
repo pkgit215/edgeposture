@@ -10,6 +10,17 @@ The headline finding: **attack-shaped traffic that reached your origin uninspect
 
 Cleaning up dead rules and recovering the few dollars they cost is a bonus, not the point.
 
+## Table of contents
+
+- [What it looks like](#what-it-looks-like)
+- [What it does](#what-it-does)
+- [What you can do today](#what-you-can-do-today)
+- [What EdgePosture asks of your AWS account](#what-edgeposture-asks-of-your-aws-account)
+- [Status](#status)
+- [About](#about)
+- [Operating EdgePosture as a SaaS](#operating-edgeposture-as-a-saas)
+- [Contributing](#contributing)
+
 ## What it looks like
 
 ![EdgePosture findings dashboard — severity badges, account-specific remediation, FMS pill](docs/screenshots/dashboard.png)
@@ -36,9 +47,74 @@ Cleaning up dead rules and recovering the few dollars they cost is a bonus, not 
 - View the live demo at https://edgeposture.io/demo to see a sample audit — Findings, Rules, Methodology tabs, plus a downloadable sample PDF report. **No AWS setup required.**
 - That is the only end-to-end flow available in v0.1. The self-serve "audit your own AWS account" flow is not yet wired in; the hosted demo only trusts the maintainer's test account.
 
-## IAM policy (reference only)
+## What EdgePosture asks of your AWS account
 
-For the IAM role policies and AWS setup commands a future self-hosted deploy will require, see [docs/iam-setup.md](docs/iam-setup.md).
+EdgePosture only ever reads. **Nothing in the policy below is a write, modify, or delete action.** The IAM role lives in your account; EdgePosture's App Runner service assumes it via AWS STS using a per-customer ExternalId you generate during onboarding. Credentials are ephemeral (one-hour session) and never persisted on our side.
+
+The exact CloudFormation template is at [`cloudformation/customer-role.yaml`](cloudformation/customer-role.yaml). The complete walkthrough — Quick-Create URL, trust policy, ExternalId rotation — lives at [`docs/iam-setup.md`](docs/iam-setup.md). What follows is what each permission is for, in plain English.
+
+### WAF inventory
+
+These let us enumerate what firewalls exist and what's inside them.
+
+`"wafv2:ListWebACLs"`
+Lists the Web ACLs in your account so the audit knows which firewalls exist.
+
+`"wafv2:GetWebACL"`
+Reads the full rule set, default action, and visibility config of a specific Web ACL so we can analyze the rule chain.
+
+`"wafv2:ListRuleGroups"` · `"wafv2:GetRuleGroup"`
+Reads custom rule groups referenced inside your Web ACLs so the audit can inspect rules nested one level deep.
+
+`"wafv2:GetLoggingConfiguration"`
+Tells the audit where your WAF logs are going (S3 bucket or CloudWatch destination) so we can read them.
+
+`"wafv2:ListResourcesForWebACL"`
+Lists what each Web ACL is attached to (CloudFront distribution, ALB, API Gateway, AppSync, Cognito) — this is how we detect orphaned ACLs.
+
+### Resource discovery (friendly names for what your WAF protects)
+
+So the report can say "ALB `prod-api-lb`" instead of `arn:aws:elasticloadbalancing:...:loadbalancer/app/prod-api-lb/...`.
+
+`"cloudfront:ListDistributions"` · `"cloudfront:GetDistribution"`
+Resolves CloudFront distribution IDs to their alias names (`api.example.com`) for human-readable reporting.
+
+`"elasticloadbalancing:DescribeLoadBalancers"`
+Same idea for Application Load Balancers — names, not ARNs.
+
+`"apigateway:GET"`
+Read-only access to API Gateway metadata so we can name the REST/HTTP APIs your WAF is protecting. (`GET` is the only verb in API Gateway's permission grammar — there's no `apigateway:Get*` decomposition. This grant covers description endpoints only; no execute, create, or delete.)
+
+`"cognito-idp:DescribeUserPool"`
+Resolves Cognito User Pool IDs to user-pool names when a WAF protects a Cognito flow.
+
+### CloudWatch Logs
+
+If you stream WAF logs to CloudWatch Logs instead of (or in addition to) S3.
+
+`"logs:DescribeLogGroups"`
+Locates the log group your WAF is writing to.
+
+`"logs:FilterLogEvents"`
+Reads the actual WAF log events so we can compute per-rule hit counts, last-fired timestamps, count-mode samples, and bypass evidence. Filter expressions are scoped to the WAF log group only.
+
+### S3 (WAF log archive)
+
+If your WAF logs land in S3 (the more common path for production traffic).
+
+`"s3:ListBucket"` · `"s3:GetObject"`
+Reads WAF log objects from your WAF-logs bucket. The audit pulls the most recent 30 days' worth of logs, decompresses them in-memory on our side, and never copies them out. We rely on the trust policy's ExternalId and the role's narrow purpose to scope these reads — there is no path inside EdgePosture that reads any S3 object outside your WAF log discovery.
+
+### Firewall Manager
+
+For accounts where AWS Firewall Manager pushes a baseline WAF configuration from a delegated admin account.
+
+`"fms:ListPolicies"` · `"fms:GetPolicy"`
+Detects which of your Web ACL rules are FMS-managed (and therefore not freely modifiable by you). The audit flags these specially — findings on FMS-managed rules say "talk to your central security team", not "delete this rule".
+
+---
+
+For the full setup walkthrough — Quick-Create URL, trust policy, ExternalId provisioning — see [`docs/iam-setup.md`](docs/iam-setup.md).
 
 ## Status
 
@@ -92,4 +168,4 @@ clients.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Local development setup, test commands, and deploy / release notes live in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev loop, test gates, and operational notes (CFN deploy, IAM policy edits, image build, App Runner config). Developer-only setup details live in [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).
