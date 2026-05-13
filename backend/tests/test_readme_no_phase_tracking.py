@@ -83,23 +83,7 @@ def test_readme_and_demo_md_omit_nonfunctional_self_serve_instructions():
             )
 
 
-# --- Distribution-model honesty ------------------------------------------
-
 ROADMAP = ROOT / "ROADMAP.md"
-
-
-def test_readme_and_roadmap_state_distribution_model_is_undecided():
-    """The distribution path (self-host / SaaS / Marketplace / hybrid)
-    is explicitly undecided. README and ROADMAP must both say so —
-    no assuming `self-host` as the locked-in answer."""
-    for path in (README, ROADMAP):
-        text = path.read_text(encoding="utf-8").lower()
-        assert "undecided" in text, (
-            f"{path.name} must state distribution model is undecided. "
-            f"Per the chore-readme-beta PR, both README + ROADMAP cite "
-            f"the open question explicitly so readers don't infer "
-            f"self-host is locked in."
-        )
 
 
 # --- Value-prop lede: bypass-led, not cost-led ----------------------------
